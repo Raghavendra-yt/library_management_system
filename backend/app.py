@@ -20,7 +20,9 @@ from flask_sqlalchemy import SQLAlchemy
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-app = Flask(__name__)
+# Determine static folder path (for built React frontend in '../dist')
+dist_dir = os.path.abspath(os.path.join(BASE_DIR, "..", "dist"))
+app = Flask(__name__, static_folder=dist_dir, static_url_path="/")
 
 # ── Database ──────────────────────────────────────────────────────────────
 app.config["SQLALCHEMY_DATABASE_URI"] = (
@@ -857,30 +859,46 @@ def seed_database():
     print("  [OK] Seed data inserted successfully.")
 
 
+# ── Catch-All Route for Frontend ───────────────────────────────────────────
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_frontend(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return app.send_static_file(path)
+    else:
+        return app.send_static_file("index.html")
+
+
 # ---------------------------------------------------------------------------
-# Entry Point
+# Database & Migrations Initialization on Startup
+# ---------------------------------------------------------------------------
+
+with app.app_context():
+    print("Initialising database...")
+    db.create_all()           # Create tables if they don't exist
+
+    # Safe migration: add book_image column if it doesn't exist yet
+    # (handles existing library.db that pre-dates this column)
+    import sqlite3
+    db_path = os.path.join(BASE_DIR, "library.db")
+    conn = sqlite3.connect(db_path)
+    existing_cols = [row[1] for row in conn.execute("PRAGMA table_info(books)").fetchall()]
+    if "book_image" not in existing_cols:
+        conn.execute("ALTER TABLE books ADD COLUMN book_image TEXT")
+        conn.commit()
+        print("  -> Migrated: added book_image column to books table.")
+    conn.close()
+
+    seed_database()           # Populate sample data on first run
+    print("[OK] Database ready.")
+
+
+# ---------------------------------------------------------------------------
+# Entry Point (for local development only)
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    with app.app_context():
-        print("Initialising database...")
-        db.create_all()           # Create tables if they don't exist
-
-        # Safe migration: add book_image column if it doesn't exist yet
-        # (handles existing library.db that pre-dates this column)
-        import sqlite3
-        db_path = os.path.join(BASE_DIR, "library.db")
-        conn = sqlite3.connect(db_path)
-        existing_cols = [row[1] for row in conn.execute("PRAGMA table_info(books)").fetchall()]
-        if "book_image" not in existing_cols:
-            conn.execute("ALTER TABLE books ADD COLUMN book_image TEXT")
-            conn.commit()
-            print("  -> Migrated: added book_image column to books table.")
-        conn.close()
-
-        seed_database()           # Populate sample data on first run
-        print("[OK] Database ready.")
-
     print("\n[*] Library Management API running at http://127.0.0.1:5000")
     print("   CORS enabled for all origins on /api/* routes.\n")
     app.run(debug=True, host="0.0.0.0", port=5000)
+
