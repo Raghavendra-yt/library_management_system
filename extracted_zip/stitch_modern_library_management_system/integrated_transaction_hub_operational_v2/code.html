@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+
+<html lang="en" style="width: 1280px; height: 1230px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BiblioCore - Transaction &amp; Billing Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Geist:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "error-container": "#ffdad6",
+                "surface-tint": "#545f73",
+                "tertiary-fixed": "#fadfb8",
+                "outline-variant": "#c5c6cd",
+                "background": "#fbf8fa",
+                "on-tertiary-fixed-variant": "#564427",
+                "error": "#ba1a1a",
+                "secondary": "#505f76",
+                "surface-variant": "#e4e2e3",
+                "surface": "#fbf8fa",
+                "on-surface-variant": "#45474c",
+                "on-primary-container": "#8590a6",
+                "surface-dim": "#dcd9db",
+                "primary-fixed-dim": "#bcc7de",
+                "secondary-fixed-dim": "#b7c8e1",
+                "primary-container": "#1e293b",
+                "on-secondary": "#ffffff",
+                "surface-container-lowest": "#ffffff",
+                "on-surface": "#1b1b1d",
+                "secondary-container": "#d0e1fb",
+                "surface-bright": "#fbf8fa",
+                "on-tertiary-container": "#a38c6a",
+                "tertiary": "#1e1200",
+                "on-tertiary": "#ffffff",
+                "on-primary-fixed-variant": "#3c475a",
+                "inverse-primary": "#bcc7de",
+                "surface-container-low": "#f5f3f4",
+                "primary-fixed": "#d8e3fb",
+                "primary": "#091426",
+                "on-background": "#1b1b1d",
+                "on-tertiary-fixed": "#271902",
+                "on-secondary-container": "#54647a",
+                "surface-container-high": "#eae7e9",
+                "on-secondary-fixed": "#0b1c30",
+                "tertiary-container": "#35260c",
+                "inverse-on-surface": "#f3f0f2",
+                "surface-container-highest": "#e4e2e3",
+                "secondary-fixed": "#d3e4fe",
+                "outline": "#75777d",
+                "inverse-surface": "#303032",
+                "on-primary": "#ffffff",
+                "on-error": "#ffffff",
+                "on-secondary-fixed-variant": "#38485d",
+                "on-error-container": "#93000a",
+                "surface-container": "#f0edef",
+                "tertiary-fixed-dim": "#ddc39d",
+                "on-primary-fixed": "#111c2d"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "stack_gap_sm": "8px",
+                "element_gap": "16px",
+                "section_margin": "24px",
+                "page_padding": "16px",
+                "container_max_width": "1440px"
+        },
+        "fontFamily": {
+                "display-lg": [
+                        "Inter"
+                ],
+                "label-md": [
+                        "Inter"
+                ],
+                "headline-sm": [
+                        "Inter"
+                ],
+                "body-sm": [
+                        "Inter"
+                ],
+                "mono-sm": [
+                        "Geist"
+                ],
+                "body-md": [
+                        "Inter"
+                ],
+                "headline-md": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "display-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "label-md": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-sm": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-sm": [
+                        "13px",
+                        {
+                                "lineHeight": "18px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "mono-sm": [
+                        "13px",
+                        {
+                                "lineHeight": "18px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+<script>
+    function toggleTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById(tabId).classList.remove('hidden');
+    }
+</script>
+</head>
+<body class="bg-surface text-on-surface font-body-lg antialiased h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[240px] bg-primary dark:bg-primary shadow-md z-20 flex flex-col p-3">
+<div class="mb-6 flex items-center gap-2 px-2">
+<img alt="Library System Logo" class="w-8 h-8 rounded-full object-cover border-2 border-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCixAdH9mYA1N5mXzA8Uk0p7Vtl-_68Mn3rL4mfzf-gEGDQNfImXVvW1pd5yhAaRtRJSH44WLzSPqDteLI7E605U4clnMLgoD-Vu36YFDmSyTTzse_9xSaqoc_7CXLYt-7IDEIk1mkfliogZ59bWNfrYZbi-7RV0bYWiwxXPDLuE2MmPULdJlIBowtVMnNBg1JzeEFJHjXaxv5t2VWlfhzEpbtChyiuGgaZLMN-uGXkJwqAn717y62fsILyjAhdcwcPN1p-OJMljc50"/>
+<div>
+<h1 class="font-headline-sm text-[14px] leading-tight font-bold text-on-primary">Sri Gowthami Educational Institutions</h1>
+<p class="font-body-sm text-[11px] text-primary-fixed-dim">Admin Portal</p>
+</div>
+</div>
+<button class="mb-4 w-full py-1.5 px-3 bg-on-primary text-primary rounded-md font-label-md text-[11px] hover:bg-surface-variant transition-colors cursor-pointer active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 0;">add</span>
+            New Entry
+        </button>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">home</span>
+                Home
+            </a>
+<a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">library_books</span>
+                Catalog
+            </a>
+<a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">group</span>
+                Student Management
+            </a>
+<a class="flex items-center gap-2 px-3 py-2 bg-primary-container text-on-primary-container rounded-md font-body-sm text-[13px] cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">swap_horiz</span>
+                Transactions
+            </a>
+<a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">history</span>
+                History
+            </a>
+</nav>
+<div class="mt-auto border-t border-primary-fixed-dim/20 pt-3 flex flex-col gap-1">
+</div>
+</aside>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-[240px] h-full overflow-hidden">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center h-12 px-4 bg-surface dark:bg-surface-dim text-primary dark:text-primary-fixed border-b border-outline-variant z-10 shrink-0">
+<div class="flex-1 max-w-md">
+<div class="relative flex items-center w-full h-8 rounded-md bg-surface-container-low border border-outline-variant focus-within:border-primary overflow-hidden transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant ml-2 text-[18px]" style="font-variation-settings: 'FILL' 0;">search</span>
+<input class="w-full h-full bg-transparent border-none focus:ring-0 text-[13px] font-body-sm px-2 text-on-surface placeholder:text-on-surface-variant outline-none" placeholder="Search records..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 p-1.5 rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">help</span>
+</button>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 overflow-y-auto p-4 bg-background w-full max-w-container_max_width mx-auto">
+<div class="mb-4">
+<h2 class="font-headline-sm text-[20px] text-primary mb-1">Transaction &amp; Billing Hub</h2>
+<p class="font-body-sm text-[12px] text-on-surface-variant">Manage book issues, returns, and process student fines efficiently.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+<!-- Column 1: ISSUE/RETURN FORM -->
+<div class="lg:col-span-8 flex flex-col gap-4">
+<div class="bg-surface-container-lowest border border-surface-variant rounded-md p-4 shadow-sm">
+<div class="flex items-center gap-3 mb-4">
+<div class="p-1.5 bg-primary-fixed rounded-md text-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">sync_alt</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-[16px] text-on-surface">Process Transaction</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant">Search and select items to auto-fill the forms</p>
+</div>
+</div>
+<!-- Transaction Type Toggle -->
+<div class="flex gap-2 p-1 bg-surface-container-low rounded-md border border-outline-variant w-fit mb-6">
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" name="transaction_type" onchange="toggleTab('issue-tab')" type="radio" value="issue"/>
+<div class="px-4 py-1.5 rounded-md font-label-md text-[11px] peer-checked:bg-surface-container-lowest peer-checked:shadow-sm peer-checked:text-primary text-on-surface-variant transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">outbox</span>
+                                        Issue
+                                    </div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="transaction_type" onchange="toggleTab('return-tab')" type="radio" value="return"/>
+<div class="px-4 py-1.5 rounded-md font-label-md text-[11px] peer-checked:bg-surface-container-lowest peer-checked:shadow-sm peer-checked:text-primary text-on-surface-variant transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">move_to_inbox</span>
+                                        Return
+                                    </div>
+</label>
+</div>
+<!-- Issue Tab Content -->
+<form class="space-y-6 tab-content hidden" id="issue-tab">
+<!-- STUDENT INFORMATION -->
+<div>
+<h4 class="font-label-md text-[10px] text-primary uppercase tracking-wider mb-3 border-b border-surface-variant pb-1.5">STUDENT INFORMATION</h4>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Student Name</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">person</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Student Name..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Class Name / Course</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">school</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Class Name / Course..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Section</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">tag</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Section..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Student ID / Roll Number</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">tag</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Student ID / Roll Number..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Email Address</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">mail</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Email Address..." type="email"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Contact Phone</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">person</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Contact Phone..." type="tel"/>
+</div>
+</div>
+</div>
+</div>
+<!-- BOOK INFORMATION -->
+<div>
+<h4 class="font-label-md text-[10px] text-primary uppercase tracking-wider mb-3 border-b border-surface-variant pb-1.5">BOOK INFORMATION</h4>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Search Book (Optional)</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">menu_book</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Type book title or ISBN..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Accession Number / Copy ID</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">tag</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Accession Number..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Book Title</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">menu_book</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Book Title..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Edition / Publication Year</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">calendar_today</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Edition / Year..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Author</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">person</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Author..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Category</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">category</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Enter Category..." type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Shelf / Rack Location (Read-only)</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">shelves</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" placeholder="Auto-filled based on copy" readonly="" type="text"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Physical Condition</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">build</span>
+<select class="w-full pl-8 pr-6 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer">
+<option selected="">Excellent</option>
+<option>Good</option>
+<option>Fair</option>
+<option>Poor</option>
+</select>
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-outline pointer-events-none text-[16px]">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<!-- LENDING & DATES -->
+<div>
+<h4 class="font-label-md text-[10px] text-primary uppercase tracking-wider mb-3 border-b border-surface-variant pb-1.5">LENDING &amp; DATES</h4>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Lending Period (Days)</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">calendar_today</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" type="number" value="14"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Issue Date</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">calendar_month</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" type="date" value="2026-06-16"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Expected Due Date</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">event</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" type="date" value="2026-06-30"/>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-2 flex justify-end">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-md font-label-md text-[11px] hover:bg-primary-container shadow-sm hover:shadow transition-all flex items-center gap-1.5" type="button">
+                                    Process Issue
+                                    <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Return Tab Content -->
+<form class="space-y-5 tab-content" id="return-tab">
+<!-- ASSET TRANSACTION -->
+<div class="space-y-3">
+<h4 class="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5">Asset Transaction</h4>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Select Active Issued Book</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">book</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Type student name or book title to search active checkouts..." type="text"/>
+</div>
+</div>
+</div>
+<!-- TRANSACTION DETAILS -->
+<div class="space-y-3 pt-2">
+<h4 class="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5">Transaction Details</h4>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Borrower Student</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">person</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none" readonly="" type="text" value="Auto-filled"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Book Title</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">menu_book</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none" readonly="" type="text" value="Auto-filled"/>
+</div>
+</div>
+</div>
+</div>
+<!-- RETURN DATES & FINE CALCULATION -->
+<div class="space-y-3 pt-2">
+<h4 class="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5">Return Dates &amp; Fine Calculation</h4>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Issue Date</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">calendar_today</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none" readonly="" type="text" value="Auto-filled"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Expected Due Date</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">event_busy</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none" readonly="" type="text" value="Auto-filled"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-[11px] text-on-surface-variant block">Actual Return Date</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">calendar_month</span>
+<input class="w-full pl-8 pr-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" type="date" value="2024-08-16"/>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-2 flex justify-end">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-md font-label-md text-[11px] hover:bg-primary-container shadow-sm hover:shadow transition-all flex items-center gap-1.5" type="button">
+        Process Return
+        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div></form>
+</div>
+</div>
+<!-- Column 2: FINE PREVIEW & RECEIPT PANEL -->
+<div class="lg:col-span-4">
+<div class="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm sticky top-4 overflow-hidden flex flex-col min-h-[400px]">
+<div class="p-4 bg-surface-container-low border-b border-surface-variant">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-sm text-[16px] text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">receipt_long</span>
+                                    Billing Invoice
+                                </h3>
+<span class="bg-error-container text-error px-2 py-0.5 rounded font-label-md text-[10px] uppercase font-bold flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[12px]">warning</span>
+                                    Fines Pending
+                                </span>
+</div>
+<p class="font-mono-sm text-[11px] text-on-surface-variant ml-7">INV-2023-8842</p>
+</div>
+<!-- Dynamic Sidebar Content -->
+<div class="p-4 flex-1 overflow-y-auto bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9IiNlNGEyZTMiIGZpbGwtb3BhY2l0eT0iMC40Ii8+PC9zdmc+')]">
+<div class="bg-surface-container-lowest rounded-md border border-outline-variant p-3 mb-4 shadow-sm">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 bg-secondary-container rounded flex items-center justify-center text-on-secondary-container font-headline-sm text-[12px]">JS</div>
+<div>
+<p class="font-body-sm text-[12px] font-semibold text-on-surface">John Smith</p>
+<p class="font-mono-sm text-[10px] text-on-surface-variant">STU-2024-001</p>
+</div>
+</div>
+</div>
+<h4 class="font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider mb-3 border-b border-surface-variant pb-1.5">Line Items</h4>
+<ul class="space-y-3">
+<!-- Line Item 1 -->
+<li class="flex justify-between items-start">
+<div class="flex-1 pr-3">
+<p class="font-body-sm text-[12px] text-on-surface font-semibold">"Advanced Data Structures"</p>
+<p class="font-mono-sm text-[10px] text-on-surface-variant">ISBN: 978-0132847377</p>
+<p class="font-label-md text-[10px] text-error mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span>
+                                            5 days overdue
+                                        </p>
+</div>
+<div class="font-mono-sm text-[12px] text-on-surface text-right">
+                                        $5.00
+                                    </div>
+</li>
+<!-- Line Item 2 -->
+<li class="flex justify-between items-start">
+<div class="flex-1 pr-3">
+<p class="font-body-sm text-[12px] text-on-surface font-semibold">Replacement ID Card</p>
+<p class="font-mono-sm text-[10px] text-on-surface-variant">Admin Fee</p>
+</div>
+<div class="font-mono-sm text-[12px] text-on-surface text-right">
+                                        $15.00
+                                    </div>
+</li>
+</ul>
+</div>
+<!-- Footer Total & Action -->
+<div class="p-4 border-t border-surface-variant bg-surface-container-lowest">
+<div class="flex justify-between items-center mb-4">
+<span class="font-body-md text-[14px] text-on-surface font-semibold">Total Due</span>
+<span class="font-display-lg text-[24px] leading-tight text-error font-bold">$20.00</span>
+</div>
+<button class="w-full bg-primary text-on-primary px-4 py-2 rounded-md font-label-md text-[11px] hover:bg-primary-container shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[16px]">payments</span>
+                                Clear Balance &amp; Authorize
+                            </button>
+<p class="font-body-sm text-[10px] text-center text-on-surface-variant mt-2">Authorizing will generate a digital receipt.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<div aria-hidden="true" data-snapdom-sandbox="true" id="snapdom-sandbox" style="position: absolute; left: -9999px; top: -9999px; width: 0px; height: 0px; overflow: hidden;"></div></body></html>

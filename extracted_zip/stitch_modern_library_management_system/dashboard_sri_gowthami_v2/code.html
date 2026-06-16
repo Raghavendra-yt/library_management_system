@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+
+<html lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BiblioCore - Librarian Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Geist:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "surface": "#fbf8fa",
+                      "inverse-primary": "#bcc7de",
+                      "on-primary-fixed": "#111c2d",
+                      "secondary-fixed": "#d3e4fe",
+                      "secondary-container": "#d0e1fb",
+                      "primary": "#091426",
+                      "on-tertiary-container": "#a38c6a",
+                      "surface-variant": "#e4e2e3",
+                      "on-error-container": "#93000a",
+                      "surface-container-high": "#eae7e9",
+                      "error-container": "#ffdad6",
+                      "on-tertiary-fixed": "#271902",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface-variant": "#45474c",
+                      "inverse-on-surface": "#f3f0f2",
+                      "background": "#fbf8fa",
+                      "on-secondary-container": "#54647a",
+                      "error": "#ba1a1a",
+                      "surface-dim": "#dcd9db",
+                      "on-background": "#1b1b1d",
+                      "tertiary-fixed-dim": "#ddc39d",
+                      "on-primary": "#ffffff",
+                      "surface-container-highest": "#e4e2e3",
+                      "tertiary-container": "#35260c",
+                      "primary-container": "#1e293b",
+                      "tertiary": "#1e1200",
+                      "primary-fixed-dim": "#bcc7de",
+                      "outline": "#75777d",
+                      "on-secondary": "#ffffff",
+                      "on-secondary-fixed": "#0b1c30",
+                      "surface-tint": "#545f73",
+                      "on-tertiary": "#ffffff",
+                      "surface-container-low": "#f5f3f4",
+                      "on-surface": "#1b1b1d",
+                      "on-tertiary-fixed-variant": "#564427",
+                      "surface-bright": "#fbf8fa",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "on-primary-container": "#8590a6",
+                      "tertiary-fixed": "#fadfb8",
+                      "inverse-surface": "#303032",
+                      "on-primary-fixed-variant": "#3c475a",
+                      "secondary": "#505f76",
+                      "outline-variant": "#c5c6cd",
+                      "primary-fixed": "#d8e3fb",
+                      "surface-container": "#f0edef",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container_max_width": "1440px",
+                      "stack_gap_sm": "8px",
+                      "section_margin": "24px",
+                      "page_padding": "16px",
+                      "element_gap": "12px"
+              },
+              "fontFamily": {
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "mono-sm": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-sm": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "mono-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-sm": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-surface text-on-surface font-body-lg antialiased h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[240px] bg-primary dark:bg-primary shadow-md z-20 flex flex-col p-3">
+<div class="mb-6 flex items-center gap-2 px-2">
+<img alt="Library System Logo" class="w-8 h-8 rounded-full object-cover border-2 border-surface-variant" data-alt="A minimalist logo for a library system, featuring an abstract open book icon constructed from geometric shapes. The logo is rendered in crisp white against a deep slate navy background, conveying a sense of modern efficiency and institutional trust. The design is sleek and professional, with a flat vector art style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCixAdH9mYA1N5mXzA8Uk0p7Vtl-_68Mn3rL4mfzf-gEGDQNfImXVvW1pd5yhAaRtRJSH44WLzSPqDteLI7E605U4clnMLgoD-Vu36YFDmSyTTzse_9xSaqoc_7CXLYt-7IDEIk1mkfliogZ59bWNfrYZbi-7RV0bYWiwxXPDLuE2MmPULdJlIBowtVMnNBg1JzeEFJHjXaxv5t2VWlfhzEpbtChyiuGgaZLMN-uGXkJwqAn717y62fsILyjAhdcwcPN1p-OJMljc50"/>
+<div>
+<h1 class="font-headline-sm text-[14px] leading-tight font-bold text-on-primary">Sri Gowthami Educational Institutions</h1>
+<p class="font-body-sm text-[11px] text-primary-fixed-dim">Admin Portal</p>
+</div>
+</div>
+<button class="mb-4 w-full py-1.5 px-3 bg-on-primary text-primary rounded-md font-label-md text-[11px] hover:bg-surface-variant transition-colors cursor-pointer active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 0;">add</span>
+            New Entry
+        </button>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-2 px-3 py-2 bg-primary-container text-on-primary-container rounded-md font-body-sm text-[13px] cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">home</span>
+                Home
+            </a>
+<a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">library_books</span>
+                Books Catalog
+            </a>
+<a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">group</span>
+                Student Management
+            </a>
+<a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">swap_horiz</span>
+                Transactions
+            </a><a class="flex items-center gap-2 px-3 py-2 text-primary-fixed-dim hover:bg-on-primary-fixed-variant rounded-md font-body-sm text-[13px] transition-colors cursor-pointer active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 0;">history</span>
+                History
+            </a>
+</nav>
+<div class="mt-auto border-t border-primary-fixed-dim/20 pt-3 flex flex-col gap-1">
+</div>
+</aside>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-[240px] h-full overflow-hidden">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center h-12 px-4 bg-surface dark:bg-surface-dim text-primary dark:text-primary-fixed border-b border-outline-variant z-10 shrink-0">
+<div class="flex-1 max-w-md">
+<div class="relative flex items-center w-full h-8 rounded-md bg-surface-container-low border border-outline-variant focus-within:border-primary overflow-hidden transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant ml-2 text-[18px]" style="font-variation-settings: 'FILL' 0;">search</span>
+<input class="w-full h-full bg-transparent border-none focus:ring-0 text-[13px] font-body-sm px-2 text-on-surface placeholder:text-on-surface-variant" placeholder="Search catalog, students, or transactions..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 p-1.5 rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">help</span>
+</button>
+</div>
+</header>
+<!-- Dashboard Content -->
+<main class="flex-1 overflow-y-auto p-4 bg-background w-full max-w-container_max_width mx-auto">
+<div class="mb-4">
+<h2 class="font-headline-sm text-[20px] text-primary mb-1">Librarian Dashboard</h2>
+<p class="font-body-sm text-[12px] text-on-surface-variant">Overview of library metrics and actionable items for today.</p>
+</div>
+<!-- Metric Cards Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+<!-- Metric 1 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-md p-3.5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-16 h-16 bg-primary/5 rounded-bl-full -mr-2 -mt-2 transition-transform group-hover:scale-110"></div>
+<div class="flex justify-between items-start mb-2">
+<div class="p-1.5 bg-secondary-container rounded-md text-secondary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">book</span>
+</div>
+<span class="text-outline font-label-md text-[10px] uppercase">Volume</span>
+</div>
+<div>
+<h3 class="font-display-lg text-[24px] leading-tight text-on-surface mb-0.5">12,450</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant">Total Books Volume</p>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-md p-3.5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-16 h-16 bg-secondary/5 rounded-bl-full -mr-2 -mt-2 transition-transform group-hover:scale-110"></div>
+<div class="flex justify-between items-start mb-2">
+<div class="p-1.5 bg-primary-fixed rounded-md text-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">swap_calls</span>
+</div>
+<span class="text-outline font-label-md text-[10px] uppercase">Active</span>
+</div>
+<div>
+<h3 class="font-display-lg text-[24px] leading-tight text-on-surface mb-0.5">842</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant">Active Book Loans</p>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-md p-3.5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-16 h-16 bg-error/5 rounded-bl-full -mr-2 -mt-2 transition-transform group-hover:scale-110"></div>
+<div class="flex justify-between items-start mb-2">
+<div class="p-1.5 bg-error-container rounded-md text-error">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<span class="text-error font-label-md text-[10px] uppercase font-bold">Alert</span>
+</div>
+<div>
+<h3 class="font-display-lg text-[24px] leading-tight text-error mb-0.5 font-bold">34</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant">Overdue Returns Count</p>
+</div>
+</div>
+<!-- Metric 4 -->
+<div class="bg-surface-container-lowest border border-surface-variant rounded-md p-3.5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-16 h-16 bg-tertiary/5 rounded-bl-full -mr-2 -mt-2 transition-transform group-hover:scale-110"></div>
+<div class="flex justify-between items-start mb-2">
+<div class="p-1.5 bg-tertiary-fixed rounded-md text-tertiary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+<span class="text-outline font-label-md text-[10px] uppercase">Pending</span>
+</div>
+<div>
+<h3 class="font-display-lg text-[24px] leading-tight text-on-surface mb-0.5">$1,240</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant">Total Pending Fines</p>
+</div>
+</div>
+</div>
+<!-- Main Layout: 2-Column Split -->
+<div class="flex flex-col lg:flex-row gap-4">
+<!-- Left Column: Overdue List (70%) -->
+<div class="lg:w-[70%] flex flex-col gap-2">
+<div class="flex items-center justify-between mb-1">
+<h3 class="font-headline-sm text-[16px] text-primary flex items-center gap-1.5">
+<span class="material-symbols-outlined text-error text-[20px]" style="font-variation-settings: 'FILL' 1;">assignment_late</span>
+                            Overdue List
+                        </h3>
+<button class="text-primary font-label-md text-[11px] hover:underline flex items-center gap-1">
+                            View All <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+<div class="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm overflow-hidden flex-1">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">
+<th class="py-2 px-3">Student</th>
+<th class="py-2 px-3">Book Title</th>
+<th class="py-2 px-3">Due Date</th>
+<th class="py-2 px-3">Days Overdue</th>
+<th class="py-2 px-3 text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-variant font-body-sm text-[12px] text-on-surface">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-2 px-3">
+<div class="flex flex-col">
+<span class="font-medium text-primary">Eleanor Vance</span>
+<span class="font-mono-sm text-[10px] text-on-surface-variant">ID: ST-8492</span>
+</div>
+</td>
+<td class="py-2 px-3">The Haunting of Hill House</td>
+<td class="py-2 px-3">Oct 12, 2023</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-error-container text-error font-label-md text-[9px] uppercase font-bold border border-error/20">
+                                                5 Days
+                                            </span>
+</td>
+<td class="py-2 px-3 text-right">
+<button class="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm">
+<span class="material-symbols-outlined text-[14px]">mail</span>
+                                                Remind
+                                            </button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-2 px-3">
+<div class="flex flex-col">
+<span class="font-medium text-primary">Arthur Hastings</span>
+<span class="font-mono-sm text-[10px] text-on-surface-variant">ID: ST-9104</span>
+</div>
+</td>
+<td class="py-2 px-3">The Mysterious Affair at Styles</td>
+<td class="py-2 px-3">Oct 14, 2023</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-error-container/70 text-error font-label-md text-[9px] uppercase font-bold border border-error/20">
+                                                3 Days
+                                            </span>
+</td>
+<td class="py-2 px-3 text-right">
+<button class="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm">
+<span class="material-symbols-outlined text-[14px]">mail</span>
+                                                Remind
+                                            </button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-2 px-3">
+<div class="flex flex-col">
+<span class="font-medium text-primary">Jane Eyre</span>
+<span class="font-mono-sm text-[10px] text-on-surface-variant">ID: ST-1102</span>
+</div>
+</td>
+<td class="py-2 px-3">Principles of Mathematics</td>
+<td class="py-2 px-3">Oct 05, 2023</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-error text-on-error font-label-md text-[9px] uppercase font-bold shadow-sm">
+                                                12 Days
+                                            </span>
+</td>
+<td class="py-2 px-3 text-right">
+<button class="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm">
+<span class="material-symbols-outlined text-[14px]">mail</span>
+                                                Remind
+                                            </button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-2 px-3">
+<div class="flex flex-col">
+<span class="font-medium text-primary">Holden Caulfield</span>
+<span class="font-mono-sm text-[10px] text-on-surface-variant">ID: ST-4431</span>
+</div>
+</td>
+<td class="py-2 px-3">The Catcher in the Rye</td>
+<td class="py-2 px-3">Oct 16, 2023</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant font-label-md text-[9px] uppercase border border-outline-variant/30">
+                                                1 Day
+                                            </span>
+</td>
+<td class="py-2 px-3 text-right">
+<button class="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm">
+<span class="material-symbols-outlined text-[14px]">mail</span>
+                                                Remind
+                                            </button>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="py-2 px-3">
+<div class="flex flex-col">
+<span class="font-medium text-primary">Winston Smith</span>
+<span class="font-mono-sm text-[10px] text-on-surface-variant">ID: ST-1984</span>
+</div>
+</td>
+<td class="py-2 px-3">1984</td>
+<td class="py-2 px-3">Oct 10, 2023</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-error-container text-error font-label-md text-[9px] uppercase font-bold border border-error/20">
+                                                7 Days
+                                            </span>
+</td>
+<td class="py-2 px-3 text-right">
+<button class="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm">
+<span class="material-symbols-outlined text-[14px]">mail</span>
+                                                Remind
+                                            </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right Column: Quick Actions (30%) -->
+<div class="lg:w-[30%] flex flex-col gap-2">
+<h3 class="font-headline-sm text-[16px] text-primary mb-1 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[20px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+                        Quick Actions
+                    </h3>
+<div class="flex flex-col gap-2">
+<!-- Quick Action Card 2 -->
+<button class="w-full text-left bg-surface-container-lowest border border-surface-variant rounded-md p-3 shadow-sm hover:shadow-md hover:border-secondary-fixed-dim transition-all group flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-secondary-fixed flex items-center justify-center text-secondary group-hover:bg-secondary group-hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]">library_add</span>
+</div>
+<div>
+<h4 class="font-headline-sm text-[13px] font-semibold text-on-surface group-hover:text-secondary transition-colors">Add New Title</h4>
+<p class="font-body-sm text-[10px] text-on-surface-variant mt-0.5">Register new inventory</p>
+</div>
+</button>
+<!-- Quick Action Card 3 -->
+<button class="w-full text-left bg-surface-container-lowest border border-surface-variant rounded-md p-3 shadow-sm hover:shadow-md hover:border-tertiary-fixed-dim transition-all group flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-tertiary-fixed flex items-center justify-center text-tertiary group-hover:bg-tertiary group-hover:text-on-tertiary transition-colors">
+<span class="material-symbols-outlined text-[18px]">manufacturing</span>
+</div>
+<div>
+<h4 class="font-headline-sm text-[13px] font-semibold text-on-surface group-hover:text-tertiary transition-colors">System Config</h4>
+<p class="font-body-sm text-[10px] text-on-surface-variant mt-0.5">Fines, rules, settings</p>
+</div>
+</button>
+<!-- Mini Chart/Stats area to fill space -->
+<div class="mt-2 bg-surface-container-low rounded-md p-3 border border-surface-variant">
+<h5 class="font-label-md text-[10px] text-on-surface-variant uppercase mb-2">Today's Activity</h5>
+<div class="space-y-2">
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-on-surface">Checkouts</span>
+<span class="font-medium text-primary">142</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-1">
+<div class="bg-primary h-1 rounded-full" style="width: 75%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-on-surface">Returns</span>
+<span class="font-medium text-secondary">98</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-1">
+<div class="bg-secondary h-1 rounded-full" style="width: 45%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
