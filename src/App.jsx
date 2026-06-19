@@ -3,11 +3,12 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import Dashboard from './components/Dashboard';
 import BookCatalog from './components/BookCatalog';
 import IssueReturnForm from './components/IssueReturnForm';
-import { getDashboardStats, getStudents, getBooks, getIssuedBooks, getStudentTransactions, getStudentFines, getStudentStats, payFine } from './lib/api';
+import { getDashboardStats, getStudents, getBooks, getIssuedBooks, getStudentTransactions, getStudentFines, getStudentStats, payFine, renewBook, updateStudent } from './lib/api';
 
 // Student Management View Component
 function StudentManagement({ 
   students, 
+  setStudents,
   loading, 
   setActiveTab, 
   setPrefilledStudent, 
@@ -23,6 +24,32 @@ function StudentManagement({
   const [studentFinesList, setStudentFinesList] = useState([]);
   const [studentStatsData, setStudentStatsData] = useState(null);
   const [studentDataLoading, setStudentDataLoading] = useState(false);
+
+  // Edit student modal states
+  const [showEditStudentModal, setShowEditStudentModal] = useState(false);
+  const [editStudentData, setEditStudentData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    status: 'Active'
+  });
+
+  const handleEditStudentSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const updated = await updateStudent(currentStudentId, editStudentData);
+      alert('Student profile updated successfully!');
+      setShowEditStudentModal(false);
+      const allStudents = await getStudents();
+      if (setStudents) {
+        setStudents(allStudents);
+      }
+      setSelectedStudent(allStudents.find(s => s.id === currentStudentId));
+    } catch (err) {
+      alert(`Failed to update profile: ${err.message}`);
+    }
+  };
 
   // Sync global search filter from top navigation
   useEffect(() => {
@@ -117,6 +144,7 @@ function StudentManagement({
     .filter(t => t.status === 'Active')
     .map(t => ({
       transaction_id: t.transaction_id,
+      id:       String(t.transaction_id).toUpperCase().startsWith('TRX-') ? t.transaction_id : `TRX-${String(t.transaction_id).padStart(4, '0')}`,
       title:    t.book_title,
       author:   t.book_author,
       barcode:  `B-${String(t.transaction_id).padStart(5, '0')}`,
@@ -127,6 +155,7 @@ function StudentManagement({
   const history = studentTxns
     .filter(t => t.status === 'Returned')
     .map(t => ({
+      id:     String(t.transaction_id).toUpperCase().startsWith('TRX-') ? t.transaction_id : `TRX-${String(t.transaction_id).padStart(4, '0')}`,
       title:  t.book_title,
       date:   `Returned: ${t.return_date || t.due_date}`,
       status: t.return_date && t.return_date > t.due_date ? 'Late' : 'On Time',
@@ -138,7 +167,7 @@ function StudentManagement({
     .map(f => ({
       id:     String(f.fine_id),
       fineId: f.fine_id,
-      item:   `Overdue: ${f.book_title}`,
+      item:   `${String(f.transaction_id).toUpperCase().startsWith('TRX-') ? f.transaction_id : `TRX-${String(f.transaction_id).padStart(4, '0')}`} — Overdue: ${f.book_title}`,
       amount: f.fine_amount,
     }));
 
@@ -147,7 +176,7 @@ function StudentManagement({
     .filter(f => f.payment_status === 'Paid')
     .map(f => ({
       date:     f.paid_date || f.due_date,
-      category: `Fine: ${f.book_title}`,
+      category: `Fine: ${f.book_title} (${String(f.transaction_id).toUpperCase().startsWith('TRX-') ? f.transaction_id : `TRX-${String(f.transaction_id).padStart(4, '0')}`})`,
       amount:   f.fine_amount,
       status:   'Paid',
     }));
@@ -210,8 +239,18 @@ function StudentManagement({
     }
   };
 
-  const handleRenewBook = (title) => {
-    alert(`Book "${title}" renewed successfully! Expected return date extended by 14 days.`);
+  const handleRenewBook = async (item) => {
+    try {
+      await renewBook(item.transaction_id);
+      alert(`Book "${item.title}" renewed successfully! Expected return date extended by 14 days.`);
+      const sid = selectedStudent.id || selectedStudent.student_id;
+      const txns = await getStudentTransactions(sid);
+      setStudentTxns(txns);
+      const newStats = await getStudentStats(sid);
+      setStudentStatsData(newStats);
+    } catch (err) {
+      alert(`Renewal failed: ${err.message}`);
+    }
   };
 
   // Pagination lists
@@ -352,7 +391,16 @@ function StudentManagement({
           
           <div className="flex gap-3 w-full md:w-auto">
             <button 
-              onClick={() => alert(`Edit Profile modal for ${nameDisplay} is simulated.`)}
+              onClick={() => {
+                setEditStudentData({
+                  first_name: selectedStudent.first_name || selectedStudent.name.split(' ')[0] || '',
+                  last_name: selectedStudent.last_name || selectedStudent.name.split(' ').slice(1).join(' ') || '',
+                  email: selectedStudent.email || '',
+                  phone: selectedStudent.phone || selectedStudent.contact || '',
+                  status: selectedStudent.status || 'Active'
+                });
+                setShowEditStudentModal(true);
+              }}
               className="flex-1 md:flex-none border border-outline-variant text-on-surface font-label-md text-[11px] py-2 px-4 rounded-md hover:bg-surface-container-low hover:border-primary text-primary transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer bg-transparent"
             >
               <span className="material-symbols-outlined text-[16px]">edit</span> 
@@ -500,7 +548,7 @@ function StudentManagement({
                   <thead>
                     <tr className="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">
                       <th className="py-2 px-3 font-bold">Title</th>
-                      <th className="py-2 px-3 font-bold">Barcode</th>
+                      <th className="py-2 px-3 font-bold">Transaction ID</th>
                       <th className="py-2 px-3 font-bold">Due Date</th>
                       <th className="py-2 px-3 text-right font-bold">Action</th>
                     </tr>
@@ -512,7 +560,7 @@ function StudentManagement({
                           <div className="font-medium text-primary">{item.title}</div>
                           <div className="text-on-surface-variant font-body-sm text-[10px]">{item.author}</div>
                         </td>
-                        <td className="py-2 px-3 font-mono-sm text-[10px] text-on-surface-variant">{item.barcode}</td>
+                        <td className="py-2 px-3 font-mono-sm text-[11px] text-primary">{item.id}</td>
                         <td className="py-2 px-3">
                           {item.isOverdue ? (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-error-container text-error font-label-md text-[9px] uppercase border border-error/20 font-bold">
@@ -526,7 +574,7 @@ function StudentManagement({
                         </td>
                         <td className="py-2 px-3 text-right">
                           <button 
-                            onClick={() => handleRenewBook(item.title)}
+                            onClick={() => handleRenewBook(item)}
                             className="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm cursor-pointer"
                             type="button"
                           >
@@ -573,7 +621,9 @@ function StudentManagement({
                         <span className="material-symbols-outlined text-[20px]">menu_book</span>
                       </div>
                       <div>
-                        <div className="font-body-sm text-[13px] font-semibold text-on-surface">{item.title}</div>
+                        <div className="font-body-sm text-[13px] font-semibold text-on-surface">
+                          {item.title} <span className="font-mono text-[11px] text-primary ml-1.5">{item.id}</span>
+                        </div>
                         <div className="font-body-sm text-[11px] text-on-surface-variant">{item.date}</div>
                       </div>
                     </div>
@@ -663,6 +713,111 @@ function StudentManagement({
 
         </div>
       </section>
+
+      <AnimatePresence>
+        {showEditStudentModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowEditStudentModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-lg p-6 relative z-10 border border-outline-variant shadow-xl text-left"
+            >
+              <div className="flex items-center justify-between mb-4 border-b border-surface-variant pb-2">
+                <h3 className="text-base font-bold text-primary m-0">Edit Student Profile</h3>
+                <button onClick={() => setShowEditStudentModal(false)} className="text-on-surface-variant hover:text-primary cursor-pointer bg-transparent border-none flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleEditStudentSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">First Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editStudentData.first_name}
+                    onChange={(e) => setEditStudentData(prev => ({ ...prev, first_name: e.target.value }))}
+                    className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    placeholder="Enter first name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Last Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editStudentData.last_name}
+                    onChange={(e) => setEditStudentData(prev => ({ ...prev, last_name: e.target.value }))}
+                    className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    placeholder="Enter last name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={editStudentData.email}
+                    onChange={(e) => setEditStudentData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    placeholder="Enter email address"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Contact Phone</label>
+                  <input
+                    type="text"
+                    value={editStudentData.phone}
+                    onChange={(e) => setEditStudentData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Account Status</label>
+                  <select
+                    value={editStudentData.status}
+                    onChange={(e) => setEditStudentData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Graduated">Graduated</option>
+                    <option value="Suspended">Suspended</option>
+                  </select>
+                </div>
+
+                <div className="pt-2 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditStudentModal(false)}
+                    className="px-4 py-1.5 border border-outline-variant rounded-md font-label-md text-[11px] text-on-surface-variant hover:bg-surface-container-low transition-all border-none cursor-pointer bg-transparent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-label-md text-[11px] hover:bg-primary/90 shadow-sm transition-all font-semibold border-none cursor-pointer"
+                  >
+                    Save Profile
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -676,6 +831,10 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
 
   const [allTxns, setAllTxns] = useState([]);
   const [txnLoading, setTxnLoading] = useState(true);
+
+  // Modal states for transaction details
+  const [showTxDetailsModal, setShowTxDetailsModal] = useState(false);
+  const [selectedTxDetails, setSelectedTxDetails] = useState(null);
 
   // Fetch all transactions from backend on mount
   useEffect(() => {
@@ -699,11 +858,12 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
 
   // Map backend transactions to display rows
   const historyRows = allTxns.map(tx => ({
-    id:          `TRX-${String(tx.transaction_id).padStart(4, '0')}`,
+    id:          String(tx.transaction_id).toUpperCase().startsWith('TRX-') ? tx.transaction_id : `TRX-${String(tx.transaction_id).padStart(4, '0')}`,
     studentName: tx.student_name,
     title:       tx.title || tx.book_title,
     type:        tx.status === 'Returned' ? 'Return' : 'Issue',
-    date:        tx.status === 'Returned' ? (tx.return_date || tx.due_date) : tx.issue_date,
+    issueDate:   tx.issue_date,
+    returnDate:  tx.return_date || '-',
     amount:      tx.fine_amount > 0 ? `\u20b9${Number(tx.fine_amount).toFixed(2)}` : '-',
     status:      tx.status === 'Returned'
                    ? 'Completed'
@@ -741,7 +901,26 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
   const showTo = Math.min(activePage * pageSize, totalResults);
 
   const handleExportCSV = () => {
-    alert("Exporting Transaction Logs to CSV... Download will begin shortly.");
+    const headers = ['Transaction ID', 'Student Name', 'Book Title', 'Type', 'Issue Date', 'Return Date', 'Amount', 'Status'];
+    const rows = filteredRows.map(row => [
+      row.id,
+      row.studentName,
+      row.title,
+      row.type,
+      row.issueDate,
+      row.returnDate,
+      row.amount,
+      row.status
+    ]);
+    const csvContent = [headers, ...rows].map(e => e.map(val => `"${val}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `transaction_history_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleClearFilters = () => {
@@ -814,7 +993,8 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
                 <th className="py-2.5 px-3">Student Name</th>
                 <th className="py-2.5 px-3">Book Title</th>
                 <th className="py-2.5 px-3">Type</th>
-                <th className="py-2.5 px-3">Date</th>
+                <th className="py-2.5 px-3">Issue Date</th>
+                <th className="py-2.5 px-3">Return Date</th>
                 <th className="py-2.5 px-3">Amount</th>
                 <th className="py-2.5 px-3">Status</th>
                 <th className="py-2.5 px-3 text-right">Actions</th>
@@ -823,7 +1003,7 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
             <tbody className="divide-y divide-surface-variant font-body-sm text-[12px] text-on-surface">
               {paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-8 text-on-surface-variant">No matching records found.</td>
+                  <td colSpan="9" className="text-center py-8 text-on-surface-variant">No matching records found.</td>
                 </tr>
               ) : (
                 paginatedRows.map((row, idx) => (
@@ -843,7 +1023,8 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
                         <span className={row.type === 'Fine Payment' ? 'text-error font-semibold' : ''}>{row.type}</span>
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-on-surface-variant">{row.date}</td>
+                    <td className="py-2.5 px-3 text-on-surface-variant">{row.issueDate}</td>
+                    <td className="py-2.5 px-3 text-on-surface-variant">{row.returnDate}</td>
                     <td className={`py-2.5 px-3 ${row.type === 'Fine Payment' ? 'text-on-surface font-medium' : 'text-on-surface-variant'}`}>{row.amount}</td>
                     <td className="py-2.5 px-3">
                       <span className={`inline-flex px-1.5 py-0.5 rounded font-label-md text-[9px] uppercase border font-bold ${
@@ -858,7 +1039,10 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
                     </td>
                     <td className="py-2.5 px-3 text-right">
                       <button 
-                        onClick={() => alert(`Details and logs for transaction ${row.id} are being requested.`)}
+                        onClick={() => {
+                          setSelectedTxDetails(row);
+                          setShowTxDetailsModal(true);
+                        }}
                         className="text-on-surface-variant hover:text-primary transition-colors p-1 rounded hover:bg-surface-container border-none bg-transparent cursor-pointer flex items-center ml-auto"
                       >
                         <span className="material-symbols-outlined text-[16px]">more_vert</span>
@@ -936,6 +1120,94 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
         </div>
 
       </div>
+
+      <AnimatePresence>
+        {showTxDetailsModal && selectedTxDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowTxDetailsModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-lg p-6 relative z-10 border border-outline-variant shadow-xl text-left"
+            >
+              <div className="flex items-center justify-between mb-4 border-b border-surface-variant pb-2">
+                <h3 className="text-base font-bold text-primary flex items-center gap-1.5 m-0">
+                  <span className="material-symbols-outlined text-[20px]">info</span>
+                  Transaction Details
+                </h3>
+                <button onClick={() => setShowTxDetailsModal(false)} className="text-on-surface-variant hover:text-primary cursor-pointer bg-transparent border-none flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-4 text-[13px] font-body-sm text-on-surface">
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Transaction ID</span>
+                  <span className="col-span-2 font-semibold font-mono text-primary">{selectedTxDetails.id}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Borrower</span>
+                  <span className="col-span-2 font-semibold text-primary">{selectedTxDetails.studentName}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Book Title</span>
+                  <span className="col-span-2">{selectedTxDetails.title}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Lending Type</span>
+                  <span className="col-span-2">
+                    <span className={`inline-flex px-1.5 py-0.5 rounded font-label-md text-[9px] uppercase border font-bold ${
+                      selectedTxDetails.type === 'Issue'
+                        ? 'bg-primary-container text-on-primary-container border-primary/20'
+                        : 'bg-secondary-container text-on-secondary-container border-secondary/20'
+                    }`}>{selectedTxDetails.type}</span>
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Issue Date</span>
+                  <span className="col-span-2 font-mono text-on-surface-variant">{selectedTxDetails.issueDate}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Return Date</span>
+                  <span className="col-span-2 font-mono text-on-surface-variant">{selectedTxDetails.returnDate}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Accrued Fine</span>
+                  <span className="col-span-2 font-semibold text-error">{selectedTxDetails.amount !== '-' ? selectedTxDetails.amount : 'None'}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                  <span className="text-on-surface-variant font-medium">Status</span>
+                  <span className="col-span-2">
+                    <span className={`inline-flex px-1.5 py-0.5 rounded font-label-md text-[9px] uppercase border font-bold ${
+                      selectedTxDetails.status === 'Completed'
+                        ? 'bg-secondary-container/50 text-secondary border-secondary/20'
+                        : selectedTxDetails.status === 'Overdue'
+                          ? 'bg-error-container text-error border-error/20'
+                          : 'bg-surface-variant text-on-surface-variant border-outline-variant/30'
+                    }`}>{selectedTxDetails.status}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => setShowTxDetailsModal(false)}
+                  className="px-4 py-1.5 bg-primary text-on-primary hover:bg-primary/95 rounded-md font-label-md text-[11px] transition-colors border-none cursor-pointer font-semibold shadow-sm"
+                >
+                  Close Details
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1006,7 +1278,7 @@ export default function App() {
       stats.overdueList.forEach(o => {
         if (!txs.some(t => t.title.toLowerCase() === o.title.toLowerCase() && t.studentName.toLowerCase() === o.student_name.toLowerCase())) {
           txs.push({
-            id: `TRX-${o.transaction_id}`,
+            id: String(o.transaction_id).toUpperCase().startsWith('TRX-') ? o.transaction_id : `TRX-${o.transaction_id}`,
             title: o.title,
             studentName: o.student_name,
             status: 'Overdue'
@@ -1089,6 +1361,7 @@ export default function App() {
         return (
           <StudentManagement 
             students={students} 
+            setStudents={setStudents}
             loading={loading} 
             setActiveTab={setActiveTab}
             setPrefilledStudent={setPrefilledStudent}

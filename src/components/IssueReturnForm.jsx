@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getStudents, getBooks, getIssuedBooks, issueBook, returnBook, formatDate, getDashboardStats } from '../lib/api';
+import { getStudents, getBooks, getIssuedBooks, issueBook, returnBook, formatDate, getDashboardStats, createFine, getStudentTransactions } from '../lib/api';
 
 export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent = null, clearPrefilledStudent = null }) {
   const [mode, setMode] = useState(defaultTab);
@@ -69,6 +69,8 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
   const [fineCategory, setFineCategory] = useState('Overdue');
   const [fineAmount, setFineAmount] = useState('');
   const [fineNotes, setFineNotes] = useState('');
+  const [studentTransactions, setStudentTransactions] = useState([]);
+  const [selectedTxId, setSelectedTxId] = useState('');
 
   // Status message
   const [status, setStatus] = useState(null);
@@ -106,6 +108,21 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
   useEffect(() => {
     fetchData();
   }, [mode]);
+
+  // Fetch student transactions when selectedStudent changes (for fine linking)
+  useEffect(() => {
+    if (selectedStudent) {
+      const sid = selectedStudent.student_id || selectedStudent.id;
+      getStudentTransactions(sid)
+        .then(txns => {
+          setStudentTransactions(txns);
+        })
+        .catch(console.error);
+    } else {
+      setStudentTransactions([]);
+    }
+    setSelectedTxId('');
+  }, [selectedStudent]);
 
   // Calculate Due Date dynamically
   useEffect(() => {
@@ -177,16 +194,26 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
   const handleIssueSubmit = async (e) => {
     if (e) e.preventDefault();
 
-    // Require a student and a book to be selected from the database
-    if (!selectedStudent) {
-      setStatus({ type: 'error', text: 'Please select a student from the autocomplete list.' });
+    // Resolve from typed values if not explicitly selected from autocomplete
+    let studentToUse = selectedStudent;
+    if (!studentToUse && studentRollNumber.trim()) {
+      studentToUse = students.find(s => s.id === studentRollNumber || s.student_id === studentRollNumber);
+    }
+
+    let bookToUse = selectedBook;
+    if (!bookToUse && bookTitle.trim()) {
+      bookToUse = books.find(b => b.title.toLowerCase() === bookTitle.toLowerCase() || b.isbn === accessionNumber);
+    }
+
+    if (!studentToUse) {
+      setStatus({ type: 'error', text: 'Please select a student from the autocomplete list or enter a valid Student ID.' });
       return;
     }
-    if (!selectedBook) {
-      setStatus({ type: 'error', text: 'Please select a book from the autocomplete list.' });
+    if (!bookToUse) {
+      setStatus({ type: 'error', text: 'Please select a book from the autocomplete list or enter a valid Book Title/Accession Number.' });
       return;
     }
-    if (selectedBook.available_copies < 1) {
+    if (bookToUse.available_copies < 1) {
       setStatus({ type: 'error', text: 'No copies of this book are currently available.' });
       return;
     }
@@ -194,13 +221,19 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
     try {
       setStatus({ type: 'processing', text: 'Registering transaction...' });
 
-      await issueBook({
-        student_id: selectedStudent.student_id || selectedStudent.id,
-        book_id:    selectedBook.book_id    || selectedBook.id,
+      const response = await issueBook({
+        student_id: studentToUse.student_id || studentToUse.id,
+        book_id:    bookToUse.book_id    || bookToUse.id,
         due_date:   dueDate,
       });
 
-      setStatus({ type: 'success', text: `Book "${selectedBook.title}" successfully issued to ${selectedStudent.name}!` });
+      const transactionId = response.transaction_id;
+      const formattedTxId = String(transactionId).toUpperCase().startsWith('TRX-') ? transactionId : `TRX-${String(transactionId).padStart(4, '0')}`;
+
+      setStatus({ 
+        type: 'success', 
+        text: `Book "${bookToUse.title}" successfully issued to ${studentToUse.name}! Unique Transaction ID generated: ${formattedTxId}` 
+      });
       handleClearStudent();
       handleClearBook();
       fetchData();
@@ -250,10 +283,16 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
     (b.isbn && b.isbn.toLowerCase().includes(bookSearch.toLowerCase()))
   );
 
-  const filteredTransactions = activeTransactions.filter(t => 
-    t.student_name.toLowerCase().includes(txSearch.toLowerCase()) || 
-    t.title.toLowerCase().includes(txSearch.toLowerCase())
-  );
+  const filteredTransactions = activeTransactions.filter(t => {
+    const q = txSearch.toLowerCase();
+    const formattedId = String(t.transaction_id || t.id).toLowerCase().startsWith('trx-') ? String(t.transaction_id || t.id).toLowerCase() : `trx-${String(t.transaction_id || t.id).padStart(4, '0')}`;
+    return (
+      String(t.transaction_id || t.id).includes(q) ||
+      formattedId.includes(q) ||
+      t.student_name.toLowerCase().includes(q) || 
+      t.title.toLowerCase().includes(q)
+    );
+  });
 
   // Helper selectors
   function handleStudentSelect(student) {
@@ -433,14 +472,22 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
 
     try {
       setStatus({ type: 'processing', text: 'Applying fine...' });
+      await createFine({
+        student_id: selectedStudent.student_id || selectedStudent.id,
+        amount: amount,
+        category: fineCategory,
+        notes: fineNotes,
+        transaction_id: selectedTxId || undefined,
+      });
       setStatus({ 
         type: 'success', 
-        text: `Fine of ₹${amount.toFixed(2)} (${fineCategory}) successfully applied to ${selectedStudent.name}!` 
+        text: `Fine of ₹${amount.toFixed(2)} (${fineCategory}) successfully applied to ${selectedStudent.name}!${selectedTxId ? ` Associated with TRX-${String(selectedTxId).padStart(4, '0')}.` : ''}` 
       });
       setFineAmount('');
       setFineNotes('');
       setFineStudentSearch('');
       setSelectedStudent(null);
+      setSelectedTxId('');
       fetchData();
     } catch (err) {
       console.error(err);
@@ -457,6 +504,14 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
       handleIssueSubmit(e);
     }
   };
+
+  const fullStudent = selectedTransaction 
+    ? students.find(s => s.student_id === selectedTransaction.student_id || s.id === selectedTransaction.student_id)
+    : null;
+
+  const fullBook = selectedTransaction
+    ? books.find(b => b.book_id === selectedTransaction.book_id || b.id === selectedTransaction.book_id)
+    : null;
 
   return (
     <div className="max-w-container_max_width mx-auto text-left">
@@ -913,23 +968,38 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
 
             {/* Return Tab Content */}
             {mode === 'return' && (
-              <form onSubmit={handleReturnSubmit} className="space-y-5">
+              <form onSubmit={handleReturnSubmit} className="space-y-6">
                 {/* ASSET TRANSACTION */}
                 <div className="space-y-3">
-                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5">Asset Transaction</h4>
+                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5 font-bold">Asset Transaction</h4>
                   
                   <div className="space-y-1.5 relative">
-                    <label className="font-label-md text-[11px] text-on-surface-variant block">Select Active Issued Book</label>
+                    <label className="font-label-md text-[11px] text-on-surface-variant block">Transaction ID</label>
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-outline text-[18px] shrink-0">book</span>
+                      <span className="material-symbols-outlined text-outline text-[18px] shrink-0">tag</span>
                       <div className="relative flex-1">
                         <input 
-                          className="w-full pr-8 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" 
-                          placeholder="Type student name or book title to search active checkouts..." 
+                          className="w-full pr-8 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-mono" 
+                          placeholder="Type Transaction ID (e.g., TRX-0004 or 4)..." 
                           type="text"
                           value={txSearch}
                           onChange={(e) => {
-                            setTxSearch(e.target.value);
+                            const val = e.target.value;
+                            setTxSearch(val);
+                            
+                            // Auto-detect transaction ID
+                            const match = val.trim().toUpperCase().match(/^(?:TRX-)?0*(\d+)$/);
+                            if (match) {
+                              const id = parseInt(match[1], 10);
+                              const found = activeTransactions.find(t => t.transaction_id === id || t.id === id);
+                              if (found) {
+                                setSelectedTransaction(found);
+                              } else {
+                                setSelectedTransaction(null);
+                              }
+                            } else {
+                              setSelectedTransaction(null);
+                            }
                             setShowTxDropdown(true);
                           }}
                           onFocus={() => setShowTxDropdown(true)}
@@ -960,8 +1030,9 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                               onMouseDown={() => handleTxSelect(tx)}
                               className="w-full text-left p-2.5 text-[12px] hover:bg-surface-container-low text-on-surface flex justify-between items-center cursor-pointer border-none bg-transparent"
                             >
-                              <span className="font-semibold">{tx.student_name}</span>
-                              <span className="truncate text-on-surface-variant font-semibold max-w-[200px]">{tx.title}</span>
+                              <span className="font-semibold">{String(tx.transaction_id || tx.id).toUpperCase().startsWith('TRX-') ? (tx.transaction_id || tx.id) : `TRX-${String(tx.transaction_id || tx.id).padStart(4, '0')}`}</span>
+                              <span className="text-on-surface-variant truncate font-semibold max-w-[150px]">{tx.student_name}</span>
+                              <span className="truncate text-on-surface-variant max-w-[150px]">{tx.title}</span>
                             </button>
                           ))
                         )}
@@ -970,20 +1041,127 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                   </div>
                 </div>
 
-                {/* TRANSACTION DETAILS */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5">Transaction Details</h4>
+                {/* STUDENT INFORMATION */}
+                <div>
+                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-3 border-b border-surface-variant pb-1.5">STUDENT INFORMATION</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     
                     <div className="space-y-1.5">
-                      <label className="font-label-md text-[11px] text-on-surface-variant block">Borrower Student</label>
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Student Name</label>
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-outline text-[18px] shrink-0">person</span>
                         <input 
                           className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
-                          readonly 
-                          type="text" 
-                          value={selectedTransaction ? selectedTransaction.student_name : 'Auto-filled'}
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? selectedTransaction.student_name : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Class Name / Course</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">school</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullStudent?.class_grade || 'Grade 10') : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Section</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">tag</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullStudent?.section || 'A') : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Student ID / Roll Number</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">tag</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? selectedTransaction.student_id : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Email Address</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">mail</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="email"
+                          value={selectedTransaction ? (fullStudent?.email || `${selectedTransaction.student_name.toLowerCase().replace(/\s+/g, '')}@gowthami.edu.in`) : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Contact Phone</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">phone</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="tel"
+                          value={selectedTransaction ? (fullStudent?.phone || fullStudent?.contact || '9848022338') : ''}
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* BOOK INFORMATION */}
+                <div>
+                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-3 border-b border-surface-variant pb-1.5">BOOK INFORMATION</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Search Book (Optional)</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">menu_book</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? `${selectedTransaction.title || selectedTransaction.book_title} (ISBN: ${fullBook?.isbn || ''})` : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Accession Number / Copy ID</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">tag</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullBook?.isbn || '') : ''}
                         />
                       </div>
                     </div>
@@ -994,9 +1172,80 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                         <span className="material-symbols-outlined text-outline text-[18px] shrink-0">menu_book</span>
                         <input 
                           className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
-                          readonly 
-                          type="text" 
-                          value={selectedTransaction ? selectedTransaction.title : 'Auto-filled'}
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (selectedTransaction.title || selectedTransaction.book_title) : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Edition / Publication Year</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">calendar_today</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullBook?.edition || '2023 (1st Edition)') : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Author</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">person</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullBook?.author || '') : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Category</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">category</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullBook?.category || 'General') : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Shelf / Rack Location (Read-only)</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">shelves</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullBook?.shelf || fullBook?.shelf_location || `Rack ${String.fromCharCode(65 + (fullBook?.id % 6))}, Shelf ${(fullBook?.id % 4) + 1}`) : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Physical Condition</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">build</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          placeholder="Auto-filled based on transaction" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (fullBook?.condition || 'Excellent') : ''}
                         />
                       </div>
                     </div>
@@ -1004,20 +1253,33 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                   </div>
                 </div>
 
-                {/* RETURN DATES & FINE CALCULATION */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5">Return Dates & Fine Calculation</h4>
+                {/* LENDING & DATES */}
+                <div>
+                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-3 border-b border-surface-variant pb-1.5">LENDING & DATES</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     
                     <div className="space-y-1.5">
-                      <label className="font-label-md text-[11px] text-on-surface-variant block">Issue Date</label>
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Lending Period (Days)</label>
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-outline text-[18px] shrink-0">calendar_today</span>
                         <input 
                           className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
-                          readonly 
-                          type="text" 
-                          value={selectedTransaction ? selectedTransaction.issue_date : 'Auto-filled'}
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? Math.round((new Date(selectedTransaction.expected_return_date || selectedTransaction.due_date) - new Date(selectedTransaction.issue_date)) / (1000 * 60 * 60 * 24)) : ''}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Issue Date</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">calendar_month</span>
+                        <input 
+                          className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? selectedTransaction.issue_date : ''}
                         />
                       </div>
                     </div>
@@ -1025,16 +1287,24 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                     <div className="space-y-1.5">
                       <label className="font-label-md text-[11px] text-on-surface-variant block">Expected Due Date</label>
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">event_busy</span>
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">event</span>
                         <input 
                           className="w-full pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface-variant outline-none cursor-not-allowed" 
-                          readonly 
-                          type="text" 
-                          value={selectedTransaction ? selectedTransaction.expected_return_date : 'Auto-filled'}
+                          readOnly 
+                          type="text"
+                          value={selectedTransaction ? (selectedTransaction.expected_return_date || selectedTransaction.due_date) : ''}
                         />
                       </div>
                     </div>
 
+                  </div>
+                </div>
+
+                {/* RETURN DETAILS */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5 font-bold">Return Action & Remarks</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    
                     <div className="space-y-1.5">
                       <label className="font-label-md text-[11px] text-on-surface-variant block">Actual Return Date</label>
                       <div className="flex items-center gap-2">
@@ -1048,19 +1318,10 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                       </div>
                     </div>
 
-                  </div>
-                </div>
-
-                {/* RETURN STATUS & REMARKS (OPTIONAL) */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-label-md text-[10px] text-primary uppercase tracking-wider mb-2 border-b border-surface-variant pb-1.5">Return Status & Remarks (Optional)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    {/* Upload book image */}
                     <div className="space-y-1.5">
                       <label className="font-label-md text-[11px] text-on-surface-variant block">Current Book Image</label>
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-outline text-[18px]">photo_camera</span>
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">photo_camera</span>
                         <div className="flex items-center gap-2 flex-1">
                           <input
                             type="file"
@@ -1101,11 +1362,10 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                       </div>
                     </div>
 
-                    {/* Remarks input */}
                     <div className="space-y-1.5">
                       <label className="font-label-md text-[11px] text-on-surface-variant block">Remarks / Condition Notes</label>
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-outline text-[18px]">notes</span>
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">notes</span>
                         <input
                           type="text"
                           value={remarks}
@@ -1201,6 +1461,30 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                       )}
                     </div>
 
+                    {/* Associated Transaction */}
+                    <div className="space-y-1.5">
+                      <label className="font-label-md text-[11px] text-on-surface-variant block">Associated Transaction (Optional)</label>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-outline text-[18px] shrink-0">tag</span>
+                        <div className="relative flex-1">
+                          <select 
+                            value={selectedTxId}
+                            onChange={(e) => setSelectedTxId(e.target.value)}
+                            disabled={!selectedStudent}
+                            className="w-full pr-6 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-on-surface"
+                          >
+                            <option value="">-- Choose Transaction (Default: Latest) --</option>
+                            {studentTransactions.map(tx => (
+                              <option key={tx.transaction_id || tx.id} value={tx.transaction_id || tx.id}>
+                                {String(tx.transaction_id || tx.id).toUpperCase().startsWith('TRX-') ? (tx.transaction_id || tx.id) : `TRX-${String(tx.transaction_id || tx.id).padStart(4, '0')}`} - {tx.book_title || tx.title} (Issued: {tx.issue_date})
+                              </option>
+                            ))}
+                          </select>
+                          <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-outline pointer-events-none text-[16px]">expand_more</span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Fine Category */}
                     <div className="space-y-1.5">
                       <label className="font-label-md text-[11px] text-on-surface-variant block">Fine Category</label>
@@ -1210,7 +1494,7 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                           <select 
                             value={fineCategory}
                             onChange={(e) => setFineCategory(e.target.value)}
-                            className="w-full pr-6 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer"
+                            className="w-full pr-6 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-[12px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer text-on-surface"
                           >
                             <option>Overdue</option>
                             <option>Damaged Book</option>
@@ -1260,6 +1544,7 @@ export default function IssueReturnForm({ defaultTab = 'issue', prefilledStudent
                       setFineNotes('');
                       setFineStudentSearch('');
                       setSelectedStudent(null);
+                      setSelectedTxId('');
                       setStatus(null);
                     }}
                     className="px-4 py-1.5 border border-outline-variant rounded-md font-label-md text-[11px] text-on-surface-variant hover:bg-surface-container-low transition-all border-none cursor-pointer"

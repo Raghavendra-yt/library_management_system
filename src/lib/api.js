@@ -277,6 +277,43 @@ export async function payFine(fineId) {
   return request(`/fines/${fineId}/pay`, { method: 'POST' });
 }
 
+/**
+ * renewBook(transactionId)
+ * Extends the due date of an active transaction by 14 days.
+ */
+export async function renewBook(transactionId) {
+  return request(`/transactions/renew/${transactionId}`, { method: 'POST' });
+}
+
+/**
+ * updateStudent(studentId, studentData)
+ * Updates metadata for a student.
+ */
+export async function updateStudent(studentId, studentData) {
+  const student = await request(`/students/${encodeURIComponent(studentId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(studentData),
+  });
+  return { ...student, id: student.student_id, name: student.full_name };
+}
+
+/**
+ * createFine(fineData)
+ * Creates a new manual fine for a student.
+ */
+export async function createFine(fineData) {
+  return request('/fines', {
+    method: 'POST',
+    body: JSON.stringify({
+      student_id: fineData.student_id,
+      amount: Number(fineData.amount),
+      category: fineData.category,
+      notes: fineData.notes,
+      transaction_id: fineData.transaction_id || undefined,
+    }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Misc / Stubs (unchanged behaviour)
 // ---------------------------------------------------------------------------

@@ -10,8 +10,10 @@ import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+# pyrefly: ignore [missing-import]
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+# pyrefly: ignore [missing-import]
 from flask_sqlalchemy import SQLAlchemy
 
 # ---------------------------------------------------------------------------
@@ -40,7 +42,7 @@ db = SQLAlchemy(app)
 # Constants
 # ---------------------------------------------------------------------------
 
-FINE_PER_DAY = 5.0  # ₹5 fine charged per overdue day
+FINE_PER_DAY = 10.0  # ₹10 fine charged per overdue day
 
 
 # ---------------------------------------------------------------------------
@@ -54,12 +56,14 @@ class Student(db.Model):
     """
     __tablename__ = "students"
 
-    student_id = db.Column(db.String(20), primary_key=True)
-    first_name = db.Column(db.String(80), nullable=False)
-    last_name  = db.Column(db.String(80), nullable=False)
-    email      = db.Column(db.String(120), unique=True, nullable=False)
-    phone      = db.Column(db.String(20))
-    status     = db.Column(
+    student_id  = db.Column(db.String(20), primary_key=True)
+    first_name  = db.Column(db.String(80), nullable=False)
+    last_name   = db.Column(db.String(80), nullable=False)
+    email       = db.Column(db.String(120), unique=True, nullable=False)
+    phone       = db.Column(db.String(20))
+    department  = db.Column(db.String(100))
+    class_year  = db.Column(db.String(20))
+    status      = db.Column(
         db.String(20), nullable=False, default="Active"
     )  # 'Active' | 'Graduated' | 'Suspended'
 
@@ -73,13 +77,15 @@ class Student(db.Model):
 
     def to_dict(self):
         return {
-            "student_id": self.student_id,
-            "first_name": self.first_name,
-            "last_name":  self.last_name,
-            "full_name":  f"{self.first_name} {self.last_name}",
-            "email":      self.email,
-            "phone":      self.phone,
-            "status":     self.status,
+            "student_id":  self.student_id,
+            "first_name":  self.first_name,
+            "last_name":   self.last_name,
+            "full_name":   f"{self.first_name} {self.last_name}",
+            "email":       self.email,
+            "phone":       self.phone,
+            "department":  self.department,
+            "class_year":  self.class_year,
+            "status":      self.status,
         }
 
 
@@ -128,7 +134,7 @@ class Transaction(db.Model):
     """
     __tablename__ = "transactions"
 
-    transaction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    transaction_id = db.Column(db.String(20), primary_key=True)
     book_id        = db.Column(db.Integer, db.ForeignKey("books.book_id"),       nullable=False)
     student_id     = db.Column(db.String(20), db.ForeignKey("students.student_id"), nullable=False)
     issue_date     = db.Column(db.Date, nullable=False, default=date.today)
@@ -147,15 +153,15 @@ class Transaction(db.Model):
     )
 
     def to_dict(self):
-        return {
-            "transaction_id": self.transaction_id,
-            "book_id":        self.book_id,
-            "student_id":     self.student_id,
-            "issue_date":     str(self.issue_date),
-            "due_date":       str(self.due_date),
-            "return_date":    str(self.return_date) if self.return_date else None,
-            "status":         self.status,
-        }
+      return {
+          "transaction_id": self.transaction_id,
+          "book_id":        self.book_id,
+          "student_id":     self.student_id,
+          "issue_date":     str(self.issue_date),
+          "due_date":       str(self.due_date),
+          "return_date":    str(self.return_date) if self.return_date else None,
+          "status":         self.status,
+      }
 
 
 class Fine(db.Model):
@@ -167,7 +173,7 @@ class Fine(db.Model):
 
     fine_id        = db.Column(db.Integer, primary_key=True, autoincrement=True)
     transaction_id = db.Column(
-        db.Integer, db.ForeignKey("transactions.transaction_id"), nullable=False, unique=True
+        db.String(20), db.ForeignKey("transactions.transaction_id"), nullable=False, unique=True
     )
     fine_amount    = db.Column(db.Float, nullable=False, default=0.0)
     payment_status = db.Column(db.String(20), nullable=False, default="Pending")
@@ -277,18 +283,34 @@ def dashboard_overdue():
     for txn in overdue_txns:
         days_overdue = (today - txn.due_date).days
         fine_amount  = txn.fine.fine_amount if txn.fine else calculate_fine(txn.due_date)
+        s = txn.student
+        b = txn.book
 
         result.append({
-            "transaction_id":       txn.transaction_id,
-            "student_id":           txn.student_id,
-            "student_name":         f"{txn.student.first_name} {txn.student.last_name}",
-            "title":                txn.book.title,
-            "book_id":              txn.book_id,
-            "issue_date":           str(txn.issue_date),
-            "expected_return_date": str(txn.due_date),
-            "days_overdue":         days_overdue,
-            "fine_amount":          fine_amount,
+            # ── Transaction ──────────────────────────────────────
+            "transaction_id":          txn.transaction_id,
+            "issue_date":              str(txn.issue_date),
+            "expected_return_date":    str(txn.due_date),
+            "days_overdue":            days_overdue,
+            "fine_amount":             fine_amount,
+            "fine_status":             txn.fine.payment_status if txn.fine else "Pending",
             "automated_reminder_sent": 0,
+            # ── Student ───────────────────────────────────────────
+            "student_id":    s.student_id,
+            "student_name":  f"{s.first_name} {s.last_name}",
+            "first_name":    s.first_name,
+            "last_name":     s.last_name,
+            "email":         s.email,
+            "phone":         s.phone,
+            "department":    s.department,
+            "class_year":    s.class_year,
+            "student_status": s.status,
+            # ── Book ──────────────────────────────────────────────
+            "book_id":       b.book_id,
+            "title":         b.title,
+            "author":        b.author,
+            "isbn":          b.isbn,
+            "category":      b.category,
         })
 
     return success_response(result)
@@ -420,7 +442,7 @@ def get_students():
 def add_student():
     """
     POST /api/v1/students
-    Body: { student_id, first_name, last_name, email, phone?, status? }
+    Body: { student_id, first_name, last_name, email, phone?, department?, class_year?, status? }
     """
     payload = request.get_json(silent=True)
     if not payload:
@@ -440,6 +462,8 @@ def add_student():
         last_name  = payload["last_name"],
         email      = payload["email"],
         phone      = payload.get("phone", ""),
+        department = payload.get("department", ""),
+        class_year = payload.get("class_year", ""),
         status     = payload.get("status", "Active"),
     )
     db.session.add(student)
@@ -457,6 +481,39 @@ def delete_student(student_id):
     db.session.delete(student)
     db.session.commit()
     return success_response({"deleted_student_id": student_id})
+
+
+@app.route("/api/v1/students/<student_id>", methods=["PUT"])
+def update_student(student_id):
+    """
+    PUT /api/v1/students/<student_id>
+    Updates a student record.
+    """
+    student = Student.query.get_or_404(student_id)
+    payload = request.get_json(silent=True) or {}
+
+    if "first_name" in payload:
+        student.first_name = payload["first_name"]
+    if "last_name" in payload:
+        student.last_name = payload["last_name"]
+    if "email" in payload:
+        email = payload["email"]
+        if email != student.email:
+            existing = Student.query.filter_by(email=email).first()
+            if existing:
+                return error_response("A student with this email already exists.", 409)
+        student.email = email
+    if "phone" in payload:
+        student.phone = payload["phone"]
+    if "department" in payload:
+        student.department = payload["department"]
+    if "class_year" in payload:
+        student.class_year = payload["class_year"]
+    if "status" in payload:
+        student.status = payload["status"]
+
+    db.session.commit()
+    return success_response(student.to_dict())
 
 
 @app.route("/api/v1/students/<student_id>/transactions", methods=["GET"])
@@ -640,7 +697,19 @@ def checkout_book():
         due_date = date.today() + timedelta(days=14)
 
     # Create transaction
+    last_txn = Transaction.query.order_by(Transaction.transaction_id.desc()).first()
+    if last_txn:
+        try:
+            last_id_num = int(last_txn.transaction_id.split("-")[1])
+            next_id_num = last_id_num + 1
+        except (IndexError, ValueError):
+            next_id_num = Transaction.query.count() + 1
+    else:
+        next_id_num = 1
+    new_tx_id = f"TRX-{next_id_num:04d}"
+
     txn = Transaction(
+        transaction_id = new_tx_id,
         book_id    = book.book_id,
         student_id = student.student_id,
         issue_date = date.today(),
@@ -662,7 +731,7 @@ def checkout_book():
     return success_response(response_data, 201)
 
 
-@app.route("/api/v1/transactions/return/<int:transaction_id>", methods=["POST"])
+@app.route("/api/v1/transactions/return/<transaction_id>", methods=["POST"])
 def return_book(transaction_id):
     """
     POST /api/v1/transactions/return/<transaction_id>
@@ -720,6 +789,23 @@ def return_book(transaction_id):
     })
 
 
+@app.route("/api/v1/transactions/renew/<transaction_id>", methods=["POST"])
+def renew_book(transaction_id):
+    """
+    POST /api/v1/transactions/renew/<transaction_id>
+    Extends the due_date of an active transaction by 14 days.
+    """
+    txn = Transaction.query.get_or_404(transaction_id)
+    if txn.status != "Active":
+        return error_response("Can only renew active loans.", 400)
+
+    # Extend due date by 14 days
+    txn.due_date = txn.due_date + timedelta(days=14)
+    db.session.commit()
+
+    return success_response(txn.to_dict())
+
+
 # ---------------------------------------------------------------------------
 # Routes – Fines
 # ---------------------------------------------------------------------------
@@ -769,6 +855,81 @@ def pay_fine(fine_id):
     db.session.commit()
 
     return success_response(fine.to_dict())
+
+
+@app.route("/api/v1/fines", methods=["POST"])
+def create_fine():
+    """
+    POST /api/v1/fines
+    Body: { student_id, amount, category, notes? }
+    Manually issues/applies a fine to a student.
+    """
+    payload = request.get_json(silent=True) or {}
+    student_id = payload.get("student_id")
+    amount = payload.get("amount")
+    category = payload.get("category", "Other")
+    notes = payload.get("notes", "")
+    transaction_id = payload.get("transaction_id")
+
+    if not student_id or amount is None:
+        return error_response("Missing required fields: student_id or amount.")
+
+    txn = None
+    if transaction_id:
+        try:
+            if isinstance(transaction_id, str) and transaction_id.upper().startswith("TRX-"):
+                tx_id_int = int(transaction_id[4:])
+            else:
+                tx_id_int = int(transaction_id)
+            txn = Transaction.query.filter_by(transaction_id=tx_id_int, student_id=student_id).first()
+            if not txn:
+                return error_response(f"No transaction found with ID TRX-{tx_id_int:04d} for this student.", 404)
+        except ValueError:
+            return error_response("Invalid transaction ID format.", 400)
+    else:
+        # Find latest transaction for this student
+        txn = Transaction.query.filter_by(student_id=student_id).order_by(Transaction.transaction_id.desc()).first()
+    if not txn:
+        # Create completed placeholder transaction to satisfy NOT NULL unique foreign key constraint
+        book = Book.query.first()
+        if not book:
+            return error_response("No books available in catalog to associate fine.", 400)
+        txn = Transaction(
+            book_id=book.book_id,
+            student_id=student_id,
+            issue_date=date.today(),
+            due_date=date.today(),
+            status="Returned",
+            return_date=date.today()
+        )
+        db.session.add(txn)
+        db.session.flush()
+
+    if txn.fine:
+        # Update existing fine
+        txn.fine.fine_amount += float(amount)
+        txn.fine.payment_status = "Pending"
+        fine_record = txn.fine
+    else:
+        # Create new fine
+        new_fine = Fine(
+            transaction_id=txn.transaction_id,
+            fine_amount=float(amount),
+            payment_status="Pending"
+        )
+        db.session.add(new_fine)
+        fine_record = new_fine
+
+    db.session.commit()
+
+    # Enrich response
+    res = fine_record.to_dict()
+    res["student_name"] = f"{txn.student.first_name} {txn.student.last_name}"
+    res["student_id"] = txn.student_id
+    res["book_title"] = txn.book.title
+    res["due_date"] = str(txn.due_date)
+
+    return success_response(res, 201)
 
 
 # ---------------------------------------------------------------------------
@@ -832,13 +993,13 @@ def seed_database():
     # ---------------------------------------------------------------------
     overdue_date = date.today() - timedelta(days=40)
     txns = [
-        Transaction(book_id=6, student_id="ST-8492", issue_date=overdue_date,                      due_date=overdue_date + timedelta(days=14), status="Active"),
-        Transaction(book_id=7, student_id="ST-9104", issue_date=overdue_date + timedelta(days=2),  due_date=overdue_date + timedelta(days=16), status="Active"),
-        Transaction(book_id=8, student_id="ST-1102", issue_date=overdue_date - timedelta(days=10), due_date=overdue_date + timedelta(days=4),  status="Active"),
-        Transaction(book_id=9, student_id="ST-4431", issue_date=overdue_date + timedelta(days=4),  due_date=overdue_date + timedelta(days=18), status="Active"),
-        Transaction(book_id=10,student_id="ST-1984", issue_date=overdue_date - timedelta(days=5),  due_date=overdue_date + timedelta(days=9),  status="Active"),
-        Transaction(book_id=2, student_id="ST-0001", issue_date=date.today() - timedelta(days=5),  due_date=date.today() + timedelta(days=9),  status="Active"),
-        Transaction(book_id=4, student_id="ST-0002", issue_date=date.today() - timedelta(days=3),  due_date=date.today() + timedelta(days=11), status="Active"),
+        Transaction(transaction_id="TRX-0001", book_id=6, student_id="ST-8492", issue_date=overdue_date,                      due_date=overdue_date + timedelta(days=14), status="Active"),
+        Transaction(transaction_id="TRX-0002", book_id=7, student_id="ST-9104", issue_date=overdue_date + timedelta(days=2),  due_date=overdue_date + timedelta(days=16), status="Active"),
+        Transaction(transaction_id="TRX-0003", book_id=8, student_id="ST-1102", issue_date=overdue_date - timedelta(days=10), due_date=overdue_date + timedelta(days=4),  status="Active"),
+        Transaction(transaction_id="TRX-0004", book_id=9, student_id="ST-4431", issue_date=overdue_date + timedelta(days=4),  due_date=overdue_date + timedelta(days=18), status="Active"),
+        Transaction(transaction_id="TRX-0005", book_id=10,student_id="ST-1984", issue_date=overdue_date - timedelta(days=5),  due_date=overdue_date + timedelta(days=9),  status="Active"),
+        Transaction(transaction_id="TRX-0006", book_id=2, student_id="ST-0001", issue_date=date.today() - timedelta(days=5),  due_date=date.today() + timedelta(days=9),  status="Active"),
+        Transaction(transaction_id="TRX-0007", book_id=4, student_id="ST-0002", issue_date=date.today() - timedelta(days=3),  due_date=date.today() + timedelta(days=11), status="Active"),
     ]
     db.session.add_all(txns)
     db.session.flush()

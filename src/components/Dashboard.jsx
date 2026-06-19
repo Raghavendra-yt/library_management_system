@@ -8,6 +8,7 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
   const [loading, setLoading] = useState(true);
   const [notifyingId, setNotifyingId] = useState(null);
   const [showOverdueModal, setShowOverdueModal] = useState(false);
+  const [selectedOverdue, setSelectedOverdue] = useState(null);
 
   // Animation variants
   const containerVariants = {
@@ -94,6 +95,11 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
     } else {
       return 'bg-surface-variant text-on-surface-variant border border-outline-variant/30';
     }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   if (loading || !stats) {
@@ -236,7 +242,7 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
                   <tr className="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">
                     <th className="py-2 px-3">Student</th>
                     <th className="py-2 px-3">Book Title</th>
-                    <th className="py-2 px-3">Due Date</th>
+                    <th className="py-2 px-3">Expected Return Date</th>
                     <th className="py-2 px-3">Days Overdue</th>
                     <th className="py-2 px-3">Due Amount</th>
                   </tr>
@@ -253,17 +259,19 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="hover:bg-surface-container-low transition-colors group"
+                            onClick={() => setSelectedOverdue(item)}
+                            className="hover:bg-error-container/20 transition-colors group cursor-pointer"
+                            title="Click to view details"
                           >
                             <td className="py-2 px-3">
                               <div className="flex flex-col">
-                                <span className="font-medium text-primary">{item.student_name}</span>
+                                <span className="font-medium text-primary group-hover:underline">{item.student_name}</span>
                                 <span className="font-mono-sm text-[10px] text-on-surface-variant">ID: {item.student_id || `ST-${1000 + item.transaction_id}`}</span>
                               </div>
                             </td>
                             <td className="py-2 px-3">{item.title || item.book_title}</td>
                             <td className="py-2 px-3">
-                              {new Date(item.expected_return_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {formatDate(item.expected_return_date)}
                             </td>
                             <td className="py-2 px-3">
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-label-md text-[9px] uppercase ${getOverdueBadgeClass(overdueDays)}`}>
@@ -354,7 +362,7 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-4xl rounded-lg p-6 relative z-10 border border-surface-variant shadow-xl text-left flex flex-col max-h-[85vh]"
+              className="bg-white w-full max-w-5xl rounded-lg p-6 relative z-10 border border-surface-variant shadow-xl text-left flex flex-col max-h-[85vh]"
             >
               <div className="flex items-center justify-between mb-4 border-b border-surface-variant pb-2 shrink-0">
                 <h3 className="text-base font-bold text-primary flex items-center gap-1.5 m-0">
@@ -372,7 +380,7 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
                     <tr className="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider sticky top-0 z-10">
                       <th className="py-2.5 px-3">Student</th>
                       <th className="py-2.5 px-3">Book Title</th>
-                      <th className="py-2.5 px-3">Due Date</th>
+                      <th className="py-2.5 px-3">Expected Return Date</th>
                       <th className="py-2.5 px-3">Days Overdue</th>
                       <th className="py-2.5 px-3">Due Amount</th>
                     </tr>
@@ -384,17 +392,19 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
                         return (
                           <tr 
                             key={item.transaction_id}
-                            className="hover:bg-surface-container-low transition-colors"
+                            onClick={() => setSelectedOverdue(item)}
+                            className="hover:bg-error-container/20 transition-colors cursor-pointer group"
+                            title="Click to view details"
                           >
                             <td className="py-2.5 px-3">
                               <div className="flex flex-col">
-                                <span className="font-medium text-primary">{item.student_name}</span>
+                                <span className="font-medium text-primary group-hover:underline">{item.student_name}</span>
                                 <span className="font-mono-sm text-[10px] text-on-surface-variant">ID: {item.student_id || `ST-${1000 + item.transaction_id}`}</span>
                               </div>
                             </td>
                             <td className="py-2.5 px-3">{item.title || item.book_title}</td>
                             <td className="py-2.5 px-3">
-                              {new Date(item.expected_return_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {formatDate(item.expected_return_date)}
                             </td>
                             <td className="py-2.5 px-3">
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-label-md text-[9px] uppercase ${getOverdueBadgeClass(overdueDays)}`}>
@@ -424,6 +434,221 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
                   className="px-4 py-1.5 bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container rounded-md font-label-md text-[11px] transition-colors border-none cursor-pointer font-semibold shadow-sm"
                 >
                   Close Overdue List
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* OVERDUE DETAIL MODAL — shown when user clicks a row */}
+      <AnimatePresence>
+        {selectedOverdue && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedOverdue(null)}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+              className="bg-white w-full max-w-lg rounded-xl relative z-10 border border-surface-variant shadow-2xl text-left overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-red-600 to-red-500 px-5 py-4 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>assignment_late</span>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-[15px] m-0 leading-tight">Overdue Record</h3>
+                    <p className="text-white/70 text-[10px] m-0">{selectedOverdue.transaction_id}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="bg-white/20 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">
+                    {calculateDaysOverdue(selectedOverdue.expected_return_date)} Days Overdue
+                  </span>
+                  <button
+                    onClick={() => setSelectedOverdue(null)}
+                    className="text-white/80 hover:text-white cursor-pointer bg-white/10 hover:bg-white/20 border-none flex items-center justify-center w-7 h-7 rounded-full transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable content */}
+              <div className="overflow-y-auto flex-1 custom-scrollbar">
+                <div className="p-5 space-y-4">
+
+                  {/* ── Student Profile ── */}
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider mb-2 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[14px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>account_circle</span>
+                      Student Profile
+                    </p>
+                    <div className="bg-primary/5 rounded-xl border border-primary/15 overflow-hidden">
+                      {/* Name banner */}
+                      <div className="px-4 py-3 border-b border-primary/10 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                          <span className="text-primary font-bold text-[15px]">
+                            {(selectedOverdue.first_name?.[0] || '') + (selectedOverdue.last_name?.[0] || '')}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-[14px] font-bold text-primary m-0 leading-tight">{selectedOverdue.student_name || '—'}</p>
+                          <p className="text-[10px] text-on-surface-variant m-0 font-mono">{selectedOverdue.student_id || '—'}</p>
+                        </div>
+                        <div className="ml-auto">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            selectedOverdue.student_status === 'Active'
+                              ? 'bg-green-100 text-green-700'
+                              : selectedOverdue.student_status === 'Suspended'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-surface-variant text-on-surface-variant'
+                          }`}>
+                            {selectedOverdue.student_status || 'Active'}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Details rows */}
+                      <div className="divide-y divide-primary/10">
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-primary/60 shrink-0">mail</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Email</span>
+                          <span className="text-[12px] text-on-surface font-medium truncate">
+                            {selectedOverdue.email || <span className="italic text-on-surface-variant/50">Not provided</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-primary/60 shrink-0">phone</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Phone</span>
+                          <span className="text-[12px] text-on-surface font-medium">
+                            {selectedOverdue.phone || <span className="italic text-on-surface-variant/50">Not provided</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-primary/60 shrink-0">school</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Department</span>
+                          <span className="text-[12px] text-on-surface font-medium">
+                            {selectedOverdue.department || <span className="italic text-on-surface-variant/50">Not provided</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-primary/60 shrink-0">class</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Class / Year</span>
+                          <span className="text-[12px] text-on-surface font-medium">
+                            {selectedOverdue.class_year || <span className="italic text-on-surface-variant/50">Not provided</span>}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Book Information ── */}
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider mb-2 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[14px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>menu_book</span>
+                      Book Information
+                    </p>
+                    <div className="bg-secondary/5 rounded-xl border border-secondary/15 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-secondary/10">
+                        <p className="text-[14px] font-bold text-on-surface m-0 leading-tight">{selectedOverdue.title || selectedOverdue.book_title || '—'}</p>
+                        {selectedOverdue.author && <p className="text-[11px] text-on-surface-variant m-0 mt-0.5">by {selectedOverdue.author}</p>}
+                      </div>
+                      <div className="divide-y divide-secondary/10">
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-secondary/60 shrink-0">barcode</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">ISBN</span>
+                          <span className="text-[12px] text-on-surface font-mono">
+                            {selectedOverdue.isbn || <span className="italic text-on-surface-variant/50">—</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-secondary/60 shrink-0">category</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Category</span>
+                          <span className="text-[12px] text-on-surface font-medium">
+                            {selectedOverdue.category || <span className="italic text-on-surface-variant/50">—</span>}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-secondary/60 shrink-0">tag</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Book ID</span>
+                          <span className="text-[12px] text-on-surface font-mono">
+                            {selectedOverdue.book_id ? `#${selectedOverdue.book_id}` : <span className="italic text-on-surface-variant/50">—</span>}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Overdue Summary ── */}
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider mb-2 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[14px] text-error" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
+                      Overdue Summary
+                    </p>
+                    <div className="bg-error/5 rounded-xl border border-error/20 overflow-hidden">
+                      <div className="divide-y divide-error/10">
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-error/60 shrink-0">receipt_long</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Transaction ID</span>
+                          <span className="text-[12px] text-on-surface font-mono">{selectedOverdue.transaction_id || '—'}</span>
+                        </div>
+                        {selectedOverdue.issue_date && (
+                          <div className="flex items-center gap-3 px-4 py-2.5">
+                            <span className="material-symbols-outlined text-[15px] text-error/60 shrink-0">event</span>
+                            <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Issued On</span>
+                            <span className="text-[12px] text-on-surface">{formatDate(selectedOverdue.issue_date)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-error/60 shrink-0">event_busy</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Due Date</span>
+                          <span className="text-[12px] font-semibold text-error">{formatDate(selectedOverdue.expected_return_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="material-symbols-outlined text-[15px] text-error/60 shrink-0">hourglass_bottom</span>
+                          <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Days Overdue</span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase ${getOverdueBadgeClass(calculateDaysOverdue(selectedOverdue.expected_return_date))}`}>
+                            {calculateDaysOverdue(selectedOverdue.expected_return_date)} {calculateDaysOverdue(selectedOverdue.expected_return_date) === 1 ? 'Day' : 'Days'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-3 bg-error/10">
+                          <span className="material-symbols-outlined text-[15px] text-error shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
+                          <span className="text-[12px] text-error font-bold w-24 shrink-0">Fine Amount</span>
+                          <span className="text-[18px] font-bold text-error ml-auto">₹{selectedOverdue.fine_amount?.toLocaleString() ?? '0'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3 flex gap-2 justify-end border-t border-surface-variant/40 shrink-0 bg-surface-container-lowest">
+                <button
+                  onClick={() => setSelectedOverdue(null)}
+                  className="px-4 py-1.5 rounded-md font-label-md text-[12px] border border-surface-variant text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer bg-transparent"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedOverdue(null);
+                    setActiveTab && setActiveTab('students');
+                  }}
+                  className="px-4 py-1.5 bg-primary text-on-primary hover:bg-primary/90 rounded-md font-label-md text-[12px] transition-colors border-none cursor-pointer font-semibold shadow-sm flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[15px]">manage_accounts</span>
+                  View Student Profile
                 </button>
               </div>
             </motion.div>
