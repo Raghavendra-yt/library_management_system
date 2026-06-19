@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/',
+  base: '/library_management_system/',
   plugins: [
     react(),
     tailwindcss()

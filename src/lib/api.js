@@ -5,9 +5,7 @@
  * Requests to /api/* are automatically forwarded to http://localhost:5000.
  * The Flask server must be running: py backend/app.py
  */
-
-const BASE_URL = '/api/v1';
-
+const BASE_URL = 'https://library-management-system-mayo.onrender.com/api/v1';
 // ---------------------------------------------------------------------------
 // Internal helper — makes an HTTP request and unwraps the standard envelope
 // { status: "success", data: ... } | { status: "error", message: ... }
