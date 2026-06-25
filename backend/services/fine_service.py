@@ -241,6 +241,7 @@ def get_overdue_report() -> list[dict]:
             "department": s.department,
             "class_year": s.class_year,
             "student_status": s.status,
+            "registration_number": s.registration_number,
             # ── Book ──────────────────────────────────────────────
             "book_id": b.book_id,
             "title": b.title,

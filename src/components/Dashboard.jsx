@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { getDashboardStats, markReminderSent } from '../lib/api';
+import { MorphingSquare } from './ui/morphing-square';
 
 export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFilter = '' }) {
   const shouldReduceMotion = useReducedMotion();
@@ -105,10 +106,10 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
   if (loading || !stats) {
     return (
       <div className="h-96 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
-          <p className="text-xs text-on-surface-variant font-medium">Loading Dashboard...</p>
-        </div>
+        <MorphingSquare
+          message="Loading Dashboard..."
+          className="bg-primary"
+        />
       </div>
     );
   }
@@ -519,6 +520,15 @@ export default function Dashboard({ setActiveTab, handleGlobalAddBook, searchFil
                       </div>
                       {/* Details rows */}
                       <div className="divide-y divide-primary/10">
+                        {selectedOverdue.registration_number && (
+                          <div className="flex items-center gap-3 px-4 py-2.5">
+                            <span className="material-symbols-outlined text-[15px] text-primary/60 shrink-0">how_to_reg</span>
+                            <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Reg No</span>
+                            <span className="text-[12px] text-on-surface font-medium truncate">
+                              {selectedOverdue.registration_number}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 px-4 py-2.5">
                           <span className="material-symbols-outlined text-[15px] text-primary/60 shrink-0">mail</span>
                           <span className="text-[11px] text-on-surface-variant w-24 shrink-0">Email</span>

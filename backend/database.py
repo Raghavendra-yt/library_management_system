@@ -6,8 +6,8 @@ Called once during application startup via ``init_database()``.
 """
 
 import os
-import sqlite3
 from datetime import date, timedelta
+from sqlalchemy import inspect, text
 
 from models import db, Student, Book, Transaction, Fine
 from utils import calculate_fine
@@ -46,19 +46,28 @@ def _run_migration(base_dir: str) -> None:
 
     Currently handles:
         - ``book_image TEXT`` column on the ``books`` table.
+        - ``age INTEGER`` and ``registration_number VARCHAR`` on ``students``.
     """
-    db_path = os.path.join(base_dir, "library.db")
-    conn = sqlite3.connect(db_path)
+    inspector = inspect(db.engine)
+    
     try:
-        existing_cols = [
-            row[1] for row in conn.execute("PRAGMA table_info(books)").fetchall()
-        ]
-        if "book_image" not in existing_cols:
-            conn.execute("ALTER TABLE books ADD COLUMN book_image TEXT")
-            conn.commit()
+        book_cols = [col["name"] for col in inspector.get_columns("books")]
+        if "book_image" not in book_cols:
+            db.session.execute(text("ALTER TABLE books ADD COLUMN book_image TEXT"))
             print("  -> Migrated: added book_image column to books table.")
-    finally:
-        conn.close()
+
+        student_cols = [col["name"] for col in inspector.get_columns("students")]
+        if "age" not in student_cols:
+            db.session.execute(text("ALTER TABLE students ADD COLUMN age INTEGER"))
+            print("  -> Migrated: added age column to students table.")
+
+        if "registration_number" not in student_cols:
+            db.session.execute(text("ALTER TABLE students ADD COLUMN registration_number VARCHAR(50)"))
+            print("  -> Migrated: added registration_number column to students table.")
+            
+        db.session.commit()
+    except Exception as e:
+        print(f"  -> Migration encountered an error (safe to ignore if using existing DB): {e}")
 
 
 # ---------------------------------------------------------------------------

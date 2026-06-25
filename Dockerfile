@@ -28,6 +28,7 @@ COPY backend/ ./backend/
 # Set environment variables
 ENV PORT=8080
 ENV FLASK_APP=backend/app.py
+ENV PYTHONPATH=/app/backend
 
 EXPOSE 8080
 

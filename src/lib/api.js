@@ -5,7 +5,7 @@
  * Requests to /api/* are automatically forwarded to http://localhost:5000.
  * The Flask server must be running: py backend/app.py
  */
-const BASE_URL = 'https://library-management-system-mayo.onrender.com/api/v1';
+const BASE_URL = '/api/v1';
 // ---------------------------------------------------------------------------
 // Internal helper — makes an HTTP request and unwraps the standard envelope
 // { status: "success", data: ... } | { status: "error", message: ... }
@@ -59,7 +59,7 @@ export async function getDashboardStats() {
     // non-critical — fall back to empty
   }
 
-  return {
+  const result = {
     metrics: {
       totalBooks:   metrics.totalBooks,
       activeIssues: metrics.activeIssues,
@@ -68,11 +68,24 @@ export async function getDashboardStats() {
     },
     overdueList,
     categoryStats,
-    recentTransactions: [], // populated separately via getIssuedBooks()
+    recentTransactions: [],
   };
-}
+  
+  try {
+    const txns = await getIssuedBooks();
+    // Sort transactions by most recent issue date first and grab the top 5
+    txns.sort((a, b) => new Date(b.issue_date || b.due_date) - new Date(a.issue_date || a.due_date));
+    result.recentTransactions = txns.slice(0, 5).map(t => ({
+      ...t,
+      id: t.transaction_id ? (String(t.transaction_id).toUpperCase().startsWith('TRX-') ? t.transaction_id : `TRX-${String(t.transaction_id).padStart(4, '0')}`) : undefined,
+      date: t.issue_date ? t.issue_date.split('T')[0] : 'Today'
+    }));
+  } catch (_) {
+    // Non-critical, fallback to empty array
+  }
 
-// ---------------------------------------------------------------------------
+  return result;
+}// ---------------------------------------------------------------------------
 // Books
 // ---------------------------------------------------------------------------
 
@@ -164,7 +177,11 @@ export async function addStudent(studentData) {
       last_name:  studentData.last_name  || studentData.name?.split(' ').slice(1).join(' ') || '',
       email:      studentData.email,
       phone:      studentData.phone || studentData.contact || '',
+      department: studentData.department || '',
+      class_name: studentData.class_name || studentData.class_year || '',
+      age:        studentData.age ? Number(studentData.age) : null,
       status:     studentData.status || 'Active',
+      registration_number: studentData.registration_number || '',
     }),
   });
   return { ...student, id: student.student_id, name: student.full_name };

@@ -36,6 +36,7 @@ def get_all_transactions(status_filter: str = "") -> list[dict]:
     for txn in txns:
         item = txn.to_dict()
         item["student_name"] = f"{txn.student.first_name} {txn.student.last_name}"
+        item["registration_number"] = txn.student.registration_number
         item["book_title"] = txn.book.title
         item["fine_amount"] = txn.fine.fine_amount if txn.fine else 0.0
         result.append(item)

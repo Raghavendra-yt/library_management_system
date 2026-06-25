@@ -19,6 +19,7 @@ Run:  python app.py
 
 import os
 
+# pyrefly: ignore [missing-import]
 from flask import Flask
 from flask_cors import CORS
 
@@ -46,6 +47,29 @@ def create_app() -> Flask:
     )
     app.config.from_object(Config)
 
+    # ── Database Connection Verification & Fallback ───────────────────────
+    uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if uri.startswith("mysql"):
+        import socket
+        from urllib.parse import urlparse
+        try:
+            # Parse host and port
+            parsed = urlparse(uri.replace("mysql+pymysql", "http"))
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 3306
+            # Quick connection test with a short timeout
+            with socket.create_connection((host, port), timeout=1.0):
+                pass
+        except (socket.error, Exception) as e:
+            print("\n" + "="*80)
+            print(f"[WARNING] MySQL database server at {host}:{port} is not reachable.")
+            print(f"          Reason: {e}")
+            print("          Falling back to local SQLite database ('sqlite:///library.db')")
+            print("          to ensure the application starts and runs without errors.")
+            print("="*80 + "\n")
+            sqlite_path = os.path.join(BASE_DIR, "library.db")
+            app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_path}"
+
     # ── Extensions ────────────────────────────────────────────────────────
     db.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -72,11 +96,12 @@ def create_app() -> Flask:
 
 
 # ---------------------------------------------------------------------------
-# Entry Point (for local development only)
+# Entry Point
 # ---------------------------------------------------------------------------
 
+app = create_app()
+
 if __name__ == "__main__":
-    app = create_app()
     print("\n[*] Library Management API running at http://127.0.0.1:5000")
     print("   CORS enabled for all origins on /api/* routes.\n")
     app.run(debug=True, host="0.0.0.0", port=5000)

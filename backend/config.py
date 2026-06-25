@@ -25,7 +25,10 @@ class Config:
     """Flask application configuration."""
 
     # Database
-    SQLALCHEMY_DATABASE_URI: str = "sqlite:///" + os.path.join(BASE_DIR, "library.db")
+    SQLALCHEMY_DATABASE_URI: str = os.environ.get(
+        "DATABASE_URL", 
+        "mysql+pymysql://root:@localhost:3306/library_db"
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
 
     # Static files (built React frontend)

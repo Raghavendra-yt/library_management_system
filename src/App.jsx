@@ -3,7 +3,10 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import Dashboard from './components/Dashboard';
 import BookCatalog from './components/BookCatalog';
 import IssueReturnForm from './components/IssueReturnForm';
-import { getDashboardStats, getStudents, getBooks, getIssuedBooks, getStudentTransactions, getStudentFines, getStudentStats, payFine, renewBook, updateStudent } from './lib/api';
+import AppSidebar from './components/AppSidebar';
+import Login from './components/Login';
+import { MorphingSquare } from './components/ui/morphing-square';
+import { getDashboardStats, getStudents, getBooks, getIssuedBooks, getStudentTransactions, getStudentFines, getStudentStats, payFine, renewBook, updateStudent, addStudent } from './lib/api';
 
 // Student Management View Component
 function StudentManagement({ 
@@ -32,13 +35,67 @@ function StudentManagement({
     last_name: '',
     email: '',
     phone: '',
-    status: 'Active'
+    status: 'Active',
+    registration_number: ''
   });
+
+  // Add student modal states
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [addStudentData, setAddStudentData] = useState({
+    student_id: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    department: '',
+    class_name: '',
+    age: '',
+    status: 'Active',
+    registration_number: ''
+  });
+
+  // Catalog layout and filter states
+  const [isDetailView, setIsDetailView] = useState(false);
+  const [deptFilter, setDeptFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogPageSize, setCatalogPageSize] = useState(8);
+
+  const handleAddStudentSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const newStudent = await addStudent(addStudentData);
+
+      alert('Student registered successfully!');
+      setShowAddStudentModal(false);
+      setAddStudentData({
+        student_id: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        department: '',
+        class_name: '',
+        age: '',
+        status: 'Active',
+        registration_number: ''
+      });
+      const allStudents = await getStudents();
+      if (setStudents) {
+        setStudents(allStudents);
+      }
+      setSelectedStudent(newStudent);
+      setIsDetailView(true);
+    } catch (err) {
+      alert(`Failed to add student: ${err.message}`);
+    }
+  };
 
   const handleEditStudentSubmit = async (e) => {
     e.preventDefault();
     try {
       const updated = await updateStudent(currentStudentId, editStudentData);
+
       alert('Student profile updated successfully!');
       setShowEditStudentModal(false);
       const allStudents = await getStudents();
@@ -55,30 +112,33 @@ function StudentManagement({
   useEffect(() => {
     if (searchFilter !== undefined) {
       setStudentSearch(searchFilter);
+      setCatalogPage(1);
       setBorrowedPage(1);
       setHistoryPage(1);
       setFeesPage(1);
     }
   }, [searchFilter]);
 
+  // Sync isDetailView based on selectedStudent from props
+  useEffect(() => {
+    if (selectedStudent) {
+      setIsDetailView(true);
+    } else {
+      setIsDetailView(false);
+    }
+  }, [selectedStudent]);
+
   // Dropdown / Form states for Fine Collection
   const [selectedFineId, setSelectedFineId] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('Cash');
 
-  // Pagination states for the three cards
+  // Pagination states for the three cards in detailed view
   const [borrowedPageSize, setBorrowedPageSize] = useState(5);
   const [borrowedPage, setBorrowedPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(5);
   const [historyPage, setHistoryPage] = useState(1);
   const [feesPageSize, setFeesPageSize] = useState(5);
   const [feesPage, setFeesPage] = useState(1);
-
-  // Default select the first student when data loads
-  useEffect(() => {
-    if (students && students.length > 0 && !selectedStudent) {
-      setSelectedStudent(students[0]);
-    }
-  }, [students, selectedStudent]);
 
   // Fetch per-student data whenever selection changes
   useEffect(() => {
@@ -100,21 +160,32 @@ function StudentManagement({
   if (loading) {
     return (
       <div className="h-96 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
-          <p className="text-xs text-on-surface-variant font-medium">Loading Students...</p>
-        </div>
+        <MorphingSquare
+          message="Loading Students..."
+          className="bg-primary"
+        />
       </div>
     );
   }
 
-  // Filter students by search
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    s.id.toLowerCase().includes(studentSearch.toLowerCase())
-  );
+  // Filter students for Catalog view
+  const filteredStudents = students.filter(s => {
+    const searchVal = studentSearch.toLowerCase();
+    const regNum = s.registration_number || '';
+    const dept = getStudentDept(s).toLowerCase();
+    const status = (s.status || 'Active').toLowerCase();
 
-  const getStudentDept = (s) => {
+    const matchesSearch = s.name.toLowerCase().includes(searchVal) ||
+                          s.id.toLowerCase().includes(searchVal) ||
+                          regNum.toLowerCase().includes(searchVal);
+
+    const matchesDept = !deptFilter || dept === deptFilter.toLowerCase();
+    const matchesStatus = !statusFilter || status === statusFilter.toLowerCase();
+
+    return matchesSearch && matchesDept && matchesStatus;
+  });
+
+  function getStudentDept(s) {
     if (!s) return 'Computer Science';
     if (s.department) return s.department;
     const name = s.name.toLowerCase();
@@ -124,9 +195,8 @@ function StudentManagement({
     if (name.includes('doe') || name.includes('jimenez') || name.includes('elena')) return 'Computer Science';
     if (name.includes('smith')) return 'Engineering';
     return 'Computer Science';
-  };
+  }
 
-  // Derive active/overdue counts from live overdueList for the sidebar badge
   const getStudentOverdueCount = (s) => {
     const sid = s.id || s.student_id;
     return (stats?.overdueList || []).filter(
@@ -195,6 +265,7 @@ function StudentManagement({
   const idDisplay = selectedStudent ? (selectedStudent.id || selectedStudent.student_id) : '';
   const deptDisplay = getStudentDept(selectedStudent);
   const emailDisplay = selectedStudent?.email || '';
+  const regDisplay = selectedStudent?.registration_number || '';
   const initialsDisplay = nameDisplay ? nameDisplay.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
 
   const totalOutstandingFine = fines.reduce((sum, f) => sum + f.amount, 0);
@@ -253,467 +324,649 @@ function StudentManagement({
     }
   };
 
-  // Pagination lists
+  // Pagination for Detailed view lists
   const paginatedBorrowed = borrowed.slice((borrowedPage - 1) * borrowedPageSize, borrowedPage * borrowedPageSize);
   const paginatedHistory = history.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
   const paginatedFees = currentPaymentHistory.slice((feesPage - 1) * feesPageSize, feesPage * feesPageSize);
 
-  const renderAvatar = (s, isSelected) => {
-    if (s.avatarUrl) {
-      return (
-        <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-surface-variant/35">
-          <img alt={s.name} className="w-full h-full object-cover" src={s.avatarUrl} />
-        </div>
-      );
-    }
-    const initials = s.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    return (
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-headline-sm text-headline-sm shrink-0 ${
-        isSelected 
-          ? 'bg-secondary-container text-on-secondary-container font-semibold' 
-          : 'bg-surface-variant text-on-surface-variant'
-      }`}>
-        {initials}
-      </div>
-    );
+  // Pagination for Catalog list
+  const totalCatalogStudentsCount = filteredStudents.length;
+  const totalCatalogPagesCount = Math.ceil(totalCatalogStudentsCount / catalogPageSize);
+  const paginatedCatalogStudents = filteredStudents.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize);
+
+  const handleBackToCatalog = () => {
+    setSelectedStudent(null);
+    setIsDetailView(false);
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden -mx-4 -my-4 h-[calc(100vh-48px)]">
-      {/* Student Search Panel (Left Sidebar) */}
-      <aside className="w-80 border-r border-outline-variant bg-surface-container-lowest flex flex-col shrink-0 h-full overflow-hidden text-left">
-        <div className="p-4 border-b border-surface-variant bg-surface z-10">
-          <h2 className="font-headline-sm text-[16px] text-primary mb-3">STUDENT SEARCH</h2>
-          <div className="relative flex items-center w-full h-8 rounded-md bg-surface-container-low border border-outline-variant focus-within:border-primary overflow-hidden transition-colors">
-            <span className="material-symbols-outlined text-on-surface-variant ml-2 text-[18px]">search</span>
-            <input 
-              className="w-full h-full bg-transparent border-none focus:ring-0 text-[13px] font-body-sm px-2 text-on-surface placeholder:text-on-surface-variant focus:outline-none" 
-              placeholder="Enter Student ID or Name" 
-              type="text"
-              value={studentSearch}
-              onChange={(e) => {
-                setStudentSearch(e.target.value);
-                setBorrowedPage(1);
-                setHistoryPage(1);
-                setFeesPage(1);
-              }}
-            />
-          </div>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {filteredStudents.length === 0 ? (
-            <p className="text-xs text-on-surface-variant text-center py-6">No students found.</p>
-          ) : (
-            filteredStudents.map(s => {
-              const activeCount = getStudentActiveCount(s);
-              const overdueCount = getStudentOverdueCount(s);
-              const isSelected = selectedStudent && selectedStudent.id === s.id;
-              
-              return (
-                <div 
-                  key={s.id}
-                  onClick={() => {
-                    setSelectedStudent(s);
-                    setBorrowedPage(1);
-                    setHistoryPage(1);
-                    setFeesPage(1);
-                    setSelectedFineId('');
-                  }}
-                  className={`border rounded-md p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden group text-left ${
-                    isSelected 
-                      ? 'bg-surface-container-lowest border-primary' 
-                      : 'bg-surface-container-lowest border-surface-variant hover:bg-surface-container-low'
-                  }`}
-                >
-                  {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>}
-                  {overdueCount > 0 && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-error"></div>}
-                  
-                  <div className="flex items-center gap-3">
-                    {renderAvatar(s, isSelected)}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-body-lg text-[14px] text-on-surface font-semibold truncate m-0">{s.name}</h3>
-                      <p className="font-mono-sm text-[10px] text-on-surface-variant truncate m-0">ID: {s.id}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="font-label-md text-[11px] text-secondary">{getStudentDept(s)}</span>
-                    {overdueCount > 0 ? (
-                      <span className="bg-error-container text-error font-label-md text-[9px] uppercase px-1.5 py-0.5 rounded font-bold border border-error/20">
-                        {overdueCount} Overdue
-                      </span>
-                    ) : (
-                      <span className="bg-primary-container text-on-primary-container font-label-md text-[9px] uppercase px-1.5 py-0.5 rounded font-bold">
-                        {activeCount} Active
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </aside>
-
-      {/* Main Panel (Detail View) */}
-      <section className="flex-1 overflow-y-auto p-4 bg-background h-full text-left">
-        {/* Selected Student Profile Header */}
-        <div className="bg-surface-container-lowest border border-surface-variant rounded-md p-6 mb-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-5">
-            {selectedStudent?.avatarUrl ? (
-              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-surface font-bold shrink-0">
-                <img alt={nameDisplay} className="w-full h-full object-cover" src={selectedStudent.avatarUrl} />
-              </div>
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-display-lg text-display-lg border-2 border-surface font-bold shrink-0">
-                {initialsDisplay}
-              </div>
-            )}
+    <div className="flex-1 flex flex-col overflow-y-auto p-6 bg-background h-full text-left">
+      {!isDetailView ? (
+        /* ── STUDENTS DIRECTORY CATALOG VIEW ── */
+        <div className="flex flex-col gap-6 text-left w-full">
+          {/* Header Section */}
+          <div className="flex justify-between items-center">
             <div>
-              <h2 className="font-display-lg text-[32px] leading-tight text-on-surface mb-1 font-bold">{nameDisplay}</h2>
-              <div className="flex flex-wrap gap-x-4 gap-y-2 font-body-sm text-[12px] text-on-surface-variant">
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">badge</span> 
-                  {idDisplay}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">school</span> 
-                  {deptDisplay}, {selectedStudent?.id === '7102-21' ? 'Sophomore' : selectedStudent?.id === '9931-20' ? 'Senior' : 'Junior'}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">mail</span> 
-                  {emailDisplay}
-                </span>
-              </div>
+              <h2 className="font-headline-md text-xl text-primary m-0">Students Management Catalog</h2>
             </div>
-          </div>
-          
-          <div className="flex gap-3 w-full md:w-auto">
-            <button 
+            <button
               onClick={() => {
-                setEditStudentData({
-                  first_name: selectedStudent.first_name || selectedStudent.name.split(' ')[0] || '',
-                  last_name: selectedStudent.last_name || selectedStudent.name.split(' ').slice(1).join(' ') || '',
-                  email: selectedStudent.email || '',
-                  phone: selectedStudent.phone || selectedStudent.contact || '',
-                  status: selectedStudent.status || 'Active'
+                setAddStudentData({
+                  student_id: '',
+                  first_name: '',
+                  last_name: '',
+                  email: '',
+                  phone: '',
+                  department: '',
+                  class_name: '',
+                  age: '',
+                  status: 'Active',
+                  registration_number: ''
                 });
-                setShowEditStudentModal(true);
+                setShowAddStudentModal(true);
               }}
-              className="flex-1 md:flex-none border border-outline-variant text-on-surface font-label-md text-[11px] py-2 px-4 rounded-md hover:bg-surface-container-low hover:border-primary text-primary transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer bg-transparent"
+              className="h-9 bg-primary text-on-primary px-4 rounded-md font-label-md text-[12px] hover:bg-primary/95 transition-colors shadow-sm flex items-center gap-1 border-none cursor-pointer font-bold"
             >
-              <span className="material-symbols-outlined text-[16px]">edit</span> 
-              Edit Profile
-            </button>
-            <button 
-              onClick={handleCheckoutRedirect}
-              className="flex-1 md:flex-none bg-primary text-on-primary font-label-md text-[11px] py-2 px-4 rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm border-none font-bold cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">add_shopping_cart</span> 
-              Check Out Item
+              <span className="material-symbols-outlined text-[16px]">person_add</span>
+              Add New Student
             </button>
           </div>
-        </div>
 
-        {/* Content Bento Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          
-          <div className="lg:col-span-3 flex flex-col gap-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Collect Fines Bento Card */}
-              <div className="flex flex-col gap-2">
-                <h3 className="font-headline-sm text-[16px] text-primary mb-1 flex items-center gap-1.5 m-0 font-semibold">
-                  <span className="material-symbols-outlined text-error text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
-                  Collect Fines
-                </h3>
-                <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm p-4 flex flex-col gap-4">
-                  <div className="bg-error-container/30 p-3 rounded-md border border-error/20">
-                    <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Total Outstanding Fine</div>
-                    <div className="font-display-lg text-[24px] leading-tight text-error font-bold">₹{totalOutstandingFine.toFixed(2)}</div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="block text-on-surface-variant font-label-md text-[10px] uppercase font-bold">Select Book/Item</label>
-                    <select 
-                      value={selectedFineId}
-                      onChange={(e) => setSelectedFineId(e.target.value)}
-                      className="w-full bg-surface border border-outline-variant rounded-md px-3 py-2 text-[13px] font-body-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer h-9 text-on-surface"
-                    >
-                      <option className="text-on-surface bg-surface" value="">-- Choose fine to pay --</option>
-                      {fines.map(f => (
-                        <option className="text-on-surface bg-surface" key={f.id} value={f.id}>{f.item} - ₹{f.amount.toFixed(2)}</option>
-                      ))}
-                      {fines.length > 1 && (
-                        <option value="all" className="font-semibold text-primary bg-surface">Pay All Outstanding Fines (₹{totalOutstandingFine.toFixed(2)})</option>
-                      )}
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="block text-on-surface-variant font-label-md text-[10px] uppercase font-bold">Payment Method</label>
-                    <select 
-                      value={selectedPaymentMethod}
-                      onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                      className="w-full bg-surface border border-outline-variant rounded-md px-3 py-2 text-[13px] font-body-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer h-9 text-on-surface"
-                    >
-                      <option className="text-on-surface bg-surface" value="Cash">Cash</option>
-                      <option className="text-on-surface bg-surface" value="Card">Card</option>
-                      <option className="text-on-surface bg-surface" value="Digital">Digital</option>
-                      <option className="text-on-surface bg-surface" value="UPI">UPI</option>
-                    </select>
-                  </div>
-                  
-                  <button 
-                    onClick={handleProcessPayment}
-                    className="w-full bg-primary text-on-primary font-label-md text-[11px] py-2.5 px-4 rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm mt-2 border-none font-bold cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">point_of_sale</span>
-                    Process Payment
-                  </button>
-                </div>
-              </div>
-
-              {/* Patron Stats Bento Card */}
-              <div className="flex flex-col gap-2">
-                <h3 className="font-headline-sm text-[16px] text-primary mb-1 flex items-center gap-1.5 m-0 font-semibold">
-                  <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>bar_chart</span>
-                  Patron Stats
-                </h3>
-                
-                <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm p-4 flex flex-col gap-4 mb-4 flex-1">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
-                      <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Total Checked Out</div>
-                      <div className="font-display-lg text-[24px] leading-tight text-primary font-bold">{currentStats.totalCheckedOut}</div>
-                    </div>
-                    <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
-                      <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Late Returns</div>
-                      <div className="font-display-lg text-[24px] leading-tight text-on-surface font-bold">{currentStats.lateReturns}</div>
-                    </div>
-                    <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
-                      <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Due Books</div>
-                      <div className="font-display-lg text-[24px] leading-tight text-on-surface font-bold">{currentStats.dueBooks}</div>
-                    </div>
-                    <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
-                      <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Total Amount Paid</div>
-                      <div className="font-display-lg text-[24px] leading-tight text-primary font-bold">₹{currentStats.totalPaidFines.toFixed(2)}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 text-left">
-                    <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-2 font-bold">Account Status</div>
-                    {totalOutstandingFine > 0 ? (
-                      <div className="flex items-center gap-2 bg-error-container/25 text-error p-3 rounded-md border border-error/30">
-                        <span className="material-symbols-outlined text-error text-[18px]">warning</span>
-                        <span className="font-body-sm text-[12px] font-semibold">Account Blocked - Fines Pending</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 bg-secondary-fixed-dim/20 text-on-surface p-3 rounded-md border border-secondary-fixed-dim/30">
-                        <span className="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
-                        <span className="font-body-sm text-[12px] font-semibold">Active & In Good Standing</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Currently Borrowed Bento Card */}
-          <div className="lg:col-span-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-headline-sm text-[16px] text-primary flex items-center gap-1.5 m-0 font-semibold">
-                <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>local_library</span> 
-                Currently Borrowed 
-                <span className="bg-primary-container text-on-primary-container rounded-full px-2 py-0.5 text-label-md text-[9px] ml-1 font-bold text-white">
-                  {borrowed.length}
-                </span>
-              </h3>
-              {borrowed.length > 5 && (
-                <button 
-                  onClick={() => setBorrowedPageSize(prev => prev === 5 ? 20 : 5)}
-                  className="text-primary font-label-md text-[11px] hover:underline flex items-center gap-1 border-none bg-transparent cursor-pointer font-bold"
-                >
-                  {borrowedPageSize === 5 ? 'View All' : 'Collapse'} <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                </button>
-              )}
-            </div>
-            
-            <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm overflow-hidden flex-1">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">
-                      <th className="py-2 px-3 font-bold">Title</th>
-                      <th className="py-2 px-3 font-bold">Transaction ID</th>
-                      <th className="py-2 px-3 font-bold">Due Date</th>
-                      <th className="py-2 px-3 text-right font-bold">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-surface-variant font-body-sm text-[12px] text-on-surface">
-                    {paginatedBorrowed.map((item, index) => (
-                      <tr key={index} className="hover:bg-surface-container-low transition-colors group">
-                        <td className="py-2 px-3">
-                          <div className="font-medium text-primary">{item.title}</div>
-                          <div className="text-on-surface-variant font-body-sm text-[10px]">{item.author}</div>
-                        </td>
-                        <td className="py-2 px-3 font-mono-sm text-[11px] text-primary">{item.id}</td>
-                        <td className="py-2 px-3">
-                          {item.isOverdue ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-error-container text-error font-label-md text-[9px] uppercase border border-error/20 font-bold">
-                              Overdue
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant font-label-md text-[9px] uppercase border border-outline-variant/30">
-                              {item.dueDate}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <button 
-                            onClick={() => handleRenewBook(item)}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm cursor-pointer"
-                            type="button"
-                          >
-                            Renew
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              <div className="px-4 py-2 border-t border-surface-variant flex items-center gap-2">
-                <span className="font-label-md text-[12px] text-on-surface-variant font-bold">Books per page:</span>
-                <select 
-                  value={borrowedPageSize}
+          {/* Search Panel */}
+          <section className="bg-surface-container-lowest border border-surface-variant rounded-md p-4 shadow-sm relative overflow-hidden group">
+            <h2 className="font-headline-sm text-[16px] text-primary mb-4 flex items-center gap-1.5 m-0">
+              <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>manage_search</span>
+              Advanced Student Directory Search
+            </h2>
+            <div className="flex flex-col md:flex-row gap-3 items-end mt-4">
+              <div className="flex-1 w-full">
+                <label className="block font-label-md text-[11px] text-on-surface-variant mb-1 uppercase tracking-wider">Search Name or ID</label>
+                <input 
+                  className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary transition-colors h-9 focus:outline-none" 
+                  placeholder="Enter Student Name, ID, or Reg No..." 
+                  type="text"
+                  value={studentSearch}
                   onChange={(e) => {
-                    setBorrowedPageSize(Number(e.target.value));
-                    setBorrowedPage(1);
+                    setStudentSearch(e.target.value);
+                    setCatalogPage(1);
                   }}
-                  className="pagination-select bg-surface border border-outline-variant rounded py-1 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer text-[12px] h-8 font-medium"
+                />
+              </div>
+              <div className="w-full md:w-64">
+                <label className="block font-label-md text-[11px] text-on-surface-variant mb-1 uppercase tracking-wider">Department</label>
+                <select 
+                  className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary appearance-none cursor-pointer h-9 focus:outline-none"
+                  value={deptFilter}
+                  onChange={(e) => {
+                    setDeptFilter(e.target.value);
+                    setCatalogPage(1);
+                  }}
                 >
-                  <option className="text-on-surface bg-surface" value="5">5</option>
-                  <option className="text-on-surface bg-surface" value="10">10</option>
-                  <option className="text-on-surface bg-surface" value="20">20</option>
+                  <option value="">All Departments</option>
+                  <option value="Computer Science">Computer Science</option>
+                  <option value="Literature">Literature</option>
+                  <option value="History">History</option>
+                  <option value="Engineering">Engineering</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Chemistry">Chemistry</option>
+                </select>
+              </div>
+              <div className="w-full md:w-48">
+                <label className="block font-label-md text-[11px] text-on-surface-variant mb-1 uppercase tracking-wider">Status</label>
+                <select 
+                  className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary appearance-none cursor-pointer h-9 focus:outline-none"
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setCatalogPage(1);
+                  }}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Suspended">Suspended</option>
+                  <option value="Graduated">Graduated</option>
                 </select>
               </div>
             </div>
+          </section>
+
+          {/* Results Header */}
+          <div className="flex justify-between items-center mb-1">
+            <h3 className="font-headline-sm text-[16px] text-primary flex items-center gap-1.5 m-0">
+              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
+              Directory Results <span className="text-on-surface-variant text-[12px] font-normal ml-1">({totalCatalogStudentsCount} found)</span>
+            </h3>
           </div>
 
-          {/* Historical Checkouts Bento Card */}
-          <div className="lg:col-span-3 mt-4">
-            <h3 className="font-headline-sm text-[16px] text-primary mb-2 flex items-center gap-1.5 m-0 font-semibold">
-              <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>history</span> 
-              Recent History
-            </h3>
-            
-            <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm p-4">
-              <div className="space-y-3">
-                {paginatedHistory.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border border-surface-variant rounded-md bg-surface hover:bg-surface-container-low transition-colors group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-surface-variant rounded flex items-center justify-center text-on-surface-variant group-hover:bg-primary-fixed group-hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">menu_book</span>
-                      </div>
-                      <div>
-                        <div className="font-body-sm text-[13px] font-semibold text-on-surface">
-                          {item.title} <span className="font-mono text-[11px] text-primary ml-1.5">{item.id}</span>
-                        </div>
-                        <div className="font-body-sm text-[11px] text-on-surface-variant">{item.date}</div>
-                      </div>
-                    </div>
-                    <span className="bg-surface-container-high text-on-surface font-label-md text-[9px] uppercase px-1.5 py-0.5 rounded font-bold">
-                      {item.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="px-4 py-2 border-t border-surface-variant flex items-center gap-2 mt-3 -mx-4 -mb-4">
-                <span className="font-label-md text-[12px] text-on-surface-variant font-bold">Books per page:</span>
-                <select 
-                  value={historyPageSize}
-                  onChange={(e) => {
-                    setHistoryPageSize(Number(e.target.value));
-                    setHistoryPage(1);
-                  }}
-                  className="pagination-select bg-surface border border-outline-variant rounded py-1 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer text-[12px] h-8 font-medium"
-                >
-                  <option className="text-on-surface bg-surface" value="5">5</option>
-                  <option className="text-on-surface bg-surface" value="10">10</option>
-                  <option className="text-on-surface bg-surface" value="20">20</option>
-                </select>
-              </div>
+          {/* Catalog content */}
+          {totalCatalogStudentsCount === 0 ? (
+            <div className="bg-surface-container-lowest border border-surface-variant rounded-md p-12 text-center text-on-surface-variant">
+              <span className="material-symbols-outlined text-4xl opacity-40 mb-2">person</span>
+              <p className="text-sm font-semibold">No students match your search queries.</p>
             </div>
-          </div>
-
-          {/* Fees Collection History Bento Card */}
-          <div className="lg:col-span-3 mt-6">
-            <h3 className="font-headline-sm text-[16px] text-primary mb-2 flex items-center gap-1.5 m-0 font-semibold">
-              <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span> 
-              Fees Collection History
-            </h3>
-            
+          ) : (
+            /* LIST VIEW TABLE STYLE */
             <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">
-                      <th className="py-2 px-4 font-bold">Date</th>
-                      <th className="py-2 px-4 font-bold">Category</th>
-                      <th className="py-2 px-4 font-bold">Amount</th>
-                      <th className="py-2 px-4 text-right font-bold">Status</th>
+                      <th className="py-2.5 px-3.5 w-16">Photo</th>
+                      <th className="py-2.5 px-3.5">Name</th>
+                      <th className="py-2.5 px-3.5">Student ID</th>
+                      <th className="py-2.5 px-3.5">Department</th>
+                      <th className="py-2.5 px-3.5">Email</th>
+                      <th className="py-2.5 px-3.5">Status</th>
+                      <th className="py-2.5 px-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-surface-variant font-body-sm text-[12px] text-on-surface">
-                    {paginatedFees.length === 0 ? (
-                      <tr>
-                        <td colSpan="4" className="text-center py-6 text-on-surface-variant">No fee payment history found.</td>
-                      </tr>
-                    ) : (
-                      paginatedFees.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-surface-container-low transition-colors">
-                          <td className="py-3 px-4">{row.date}</td>
-                          <td className="py-3 px-4 font-medium">{row.category}</td>
-                          <td className="py-3 px-4">₹{row.amount.toFixed(2)}</td>
-                          <td className="py-3 px-4 text-right">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container font-label-md text-[9px] uppercase font-bold">
-                              <span className="material-symbols-outlined text-[12px]">check_circle</span> Paid
-                            </span>
+                    {paginatedCatalogStudents.map(s => {
+                      const activeCount = getStudentActiveCount(s);
+                      const overdueCount = getStudentOverdueCount(s);
+                      const dept = getStudentDept(s);
+                      return (
+                        <tr 
+                          key={s.id} 
+                          onClick={() => {
+                            setSelectedStudent(s);
+                            setBorrowedPage(1);
+                            setHistoryPage(1);
+                            setFeesPage(1);
+                            setSelectedFineId('');
+                            setIsDetailView(true);
+                          }}
+                          className="hover:bg-surface-container-low transition-colors cursor-pointer group"
+                        >
+                          <td className="py-2 px-3.5">
+                            {s.avatarUrl ? (
+                              <img 
+                                alt={s.name} 
+                                className="w-10 h-10 object-cover rounded-full shadow-sm" 
+                                src={s.avatarUrl}
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-secondary-container flex items-center justify-center text-on-secondary-container rounded-full font-bold">
+                                {s.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3.5 font-semibold text-primary">{s.name}</td>
+                          <td className="py-2.5 px-3.5 font-mono text-on-surface-variant">{s.id}</td>
+                          <td className="py-2.5 px-3.5">{dept}</td>
+                          <td className="py-2.5 px-3.5 text-on-surface-variant">{s.email || 'N/A'}</td>
+                          <td className="py-2.5 px-3.5">
+                            <div className="flex gap-1.5">
+                              <span className="bg-primary-container text-on-primary-container font-label-md text-[9px] uppercase px-1.5 py-0.5 rounded font-bold">
+                                {activeCount} Active
+                              </span>
+                              {overdueCount > 0 && (
+                                <span className="bg-error-container text-error font-label-md text-[9px] uppercase px-1.5 py-0.5 rounded font-bold border border-error/20">
+                                  {overdueCount} Overdue
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3.5 text-right">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStudent(s);
+                                setBorrowedPage(1);
+                                setHistoryPage(1);
+                                setFeesPage(1);
+                                setSelectedFineId('');
+                                setIsDetailView(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm cursor-pointer"
+                            >
+                              View Details
+                            </button>
                           </td>
                         </tr>
-                      ))
-                    )}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-              
-              <div className="px-4 py-2 border-t border-surface-variant flex items-center gap-2">
-                <span className="font-label-md text-[12px] text-on-surface-variant font-bold">Records per page:</span>
-                <select 
-                  value={feesPageSize}
+            </div>
+          )}
+
+          {/* Catalog Pagination */}
+          {totalCatalogStudentsCount > 0 && (
+            <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-surface-container-lowest border border-surface-variant rounded-md p-3.5 shadow-sm">
+              <div className="flex items-center gap-2 font-body-sm text-[12px] text-on-surface-variant shrink-0 whitespace-nowrap">
+                <span>Students per page:</span>
+                <select
+                  value={catalogPageSize}
                   onChange={(e) => {
-                    setFeesPageSize(Number(e.target.value));
-                    setFeesPage(1);
+                    setCatalogPageSize(Number(e.target.value));
+                    setCatalogPage(1);
                   }}
-                  className="pagination-select bg-surface border border-outline-variant rounded py-1 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer text-[12px] h-8 font-medium"
+                  className="pagination-select bg-surface border border-surface-variant rounded-md py-1 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer text-[12px] h-8 font-medium"
                 >
-                  <option className="text-on-surface bg-surface" value="5">5</option>
-                  <option className="text-on-surface bg-surface" value="10">10</option>
-                  <option className="text-on-surface bg-surface" value="20">20</option>
+                  <option className="bg-white text-slate-800" value="4">4</option>
+                  <option className="bg-white text-slate-800" value="8">8</option>
+                  <option className="bg-white text-slate-800" value="12">12</option>
+                  <option className="bg-white text-slate-800" value="24">24</option>
                 </select>
               </div>
+              <nav className="flex items-center gap-1">
+                <button 
+                  disabled={catalogPage === 1}
+                  onClick={() => setCatalogPage(catalogPage - 1)}
+                  className="p-1.5 text-on-surface-variant hover:bg-surface-container rounded transition-colors disabled:opacity-50 border-none bg-transparent flex items-center justify-center cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                </button>
+                {Array.from({ length: totalCatalogPagesCount }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCatalogPage(idx + 1)}
+                    className={`w-7 h-7 flex items-center justify-center font-label-md text-[11px] rounded transition-colors border-none cursor-pointer ${
+                      catalogPage === idx + 1
+                        ? 'bg-primary text-on-primary font-bold'
+                        : 'text-on-surface hover:bg-surface-container bg-transparent'
+                    }`}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+                <button 
+                  disabled={catalogPage === totalCatalogPagesCount}
+                  onClick={() => setCatalogPage(catalogPage + 1)}
+                  className="p-1.5 text-on-surface-variant hover:bg-surface-container rounded transition-colors disabled:opacity-50 border-none bg-transparent flex items-center justify-center cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              </nav>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── DETAILED PROFILE VIEW (PRESENT THEME) ── */
+        <div className="flex flex-col gap-4 text-left w-full">
+          {/* Back button at the top */}
+          <div className="mb-2">
+            <button 
+              onClick={handleBackToCatalog}
+              className="inline-flex items-center gap-1.5 text-[12px] font-bold text-primary hover:underline bg-transparent border-none cursor-pointer p-0"
+            >
+              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              Back to Students Catalog
+            </button>
+          </div>
+
+          {/* Selected Student Profile Header */}
+          <div className="bg-surface-container-lowest border border-surface-variant rounded-md p-6 mb-2 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-5">
+              {selectedStudent?.avatarUrl ? (
+                <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-surface font-bold shrink-0">
+                  <img alt={nameDisplay} className="w-full h-full object-cover" src={selectedStudent.avatarUrl} />
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-display-lg text-display-lg border-2 border-surface font-bold shrink-0">
+                  {initialsDisplay}
+                </div>
+              )}
+              <div>
+                <h2 className="font-display-lg text-[32px] leading-tight text-on-surface mb-1 font-bold">{nameDisplay}</h2>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 font-body-sm text-[12px] text-on-surface-variant">
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">badge</span> 
+                    {idDisplay}
+                  </span>
+                  {regDisplay && (
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">how_to_reg</span> 
+                      Reg No: {regDisplay}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">school</span> 
+                    {deptDisplay}, {selectedStudent?.class_year || (selectedStudent?.id === '7102-21' ? 'Sophomore' : selectedStudent?.id === '9931-20' ? 'Senior' : 'Junior')}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">mail</span> 
+                    {emailDisplay}
+                  </span>
+                  {selectedStudent?.age && (
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">cake</span> 
+                      Age: {selectedStudent.age}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 w-full md:w-auto">
+              <button 
+                onClick={() => {
+                  setEditStudentData({
+                    first_name: selectedStudent.first_name || selectedStudent.name.split(' ')[0] || '',
+                    last_name: selectedStudent.last_name || selectedStudent.name.split(' ').slice(1).join(' ') || '',
+                    email: selectedStudent.email || '',
+                    phone: selectedStudent.phone || selectedStudent.contact || '',
+                    status: selectedStudent.status || 'Active',
+                    registration_number: selectedStudent.registration_number || ''
+                  });
+                  setShowEditStudentModal(true);
+                }}
+                className="flex-1 md:flex-none border border-outline-variant text-on-surface font-label-md text-[11px] py-2 px-4 rounded-md hover:bg-surface-container-low hover:border-primary text-primary transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer bg-transparent"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit</span> 
+                Edit Profile
+              </button>
+              <button 
+                onClick={handleCheckoutRedirect}
+                className="flex-1 md:flex-none bg-primary text-on-primary font-label-md text-[11px] py-2 px-4 rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm border-none font-bold cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">add_shopping_cart</span> 
+                Check Out Item
+              </button>
             </div>
           </div>
 
-        </div>
-      </section>
+          {/* Content Bento Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-3 flex flex-col gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Collect Fines Bento Card */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-headline-sm text-[16px] text-primary mb-1 flex items-center gap-1.5 m-0 font-semibold">
+                    <span className="material-symbols-outlined text-error text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
+                    Collect Fines
+                  </h3>
+                  <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm p-4 flex flex-col gap-4">
+                    <div className="bg-error-container/30 p-3 rounded-md border border-error/20">
+                      <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Total Outstanding Fine</div>
+                      <div className="font-display-lg text-[24px] leading-tight text-error font-bold">₹{totalOutstandingFine.toFixed(2)}</div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-on-surface-variant font-label-md text-[10px] uppercase font-bold">Select Book/Item</label>
+                      <select 
+                        value={selectedFineId}
+                        onChange={(e) => setSelectedFineId(e.target.value)}
+                        className="w-full bg-surface border border-outline-variant rounded-md px-3 py-2 text-[13px] font-body-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer h-9 text-on-surface"
+                      >
+                        <option className="text-on-surface bg-surface" value="">-- Choose fine to pay --</option>
+                        {fines.map(f => (
+                          <option className="text-on-surface bg-surface" key={f.id} value={f.id}>{f.item} - ₹{f.amount.toFixed(2)}</option>
+                        ))}
+                        {fines.length > 1 && (
+                          <option value="all" className="font-semibold text-primary bg-surface">Pay All Outstanding Fines (₹{totalOutstandingFine.toFixed(2)})</option>
+                        )}
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-on-surface-variant font-label-md text-[10px] uppercase font-bold">Payment Method</label>
+                      <select 
+                        value={selectedPaymentMethod}
+                        onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                        className="w-full bg-surface border border-outline-variant rounded-md px-3 py-2 text-[13px] font-body-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer h-9 text-on-surface"
+                      >
+                        <option className="text-on-surface bg-surface" value="Cash">Cash</option>
+                        <option className="text-on-surface bg-surface" value="Card">Card</option>
+                        <option className="text-on-surface bg-surface" value="Digital">Digital</option>
+                        <option className="text-on-surface bg-surface" value="UPI">UPI</option>
+                      </select>
+                    </div>
+                    
+                    <button 
+                      onClick={handleProcessPayment}
+                      className="w-full bg-primary text-on-primary font-label-md text-[11px] py-2.5 px-4 rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm mt-2 border-none font-bold cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">point_of_sale</span>
+                      Process Payment
+                    </button>
+                  </div>
+                </div>
 
+                {/* Patron Stats Bento Card */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-headline-sm text-[16px] text-primary mb-1 flex items-center gap-1.5 m-0 font-semibold">
+                    <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>bar_chart</span>
+                    Patron Stats
+                  </h3>
+                  
+                  <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm p-4 flex flex-col gap-4 mb-4 flex-1">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
+                        <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Total Checked Out</div>
+                        <div className="font-display-lg text-[24px] leading-tight text-primary font-bold">{currentStats.totalCheckedOut}</div>
+                      </div>
+                      <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
+                        <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Late Returns</div>
+                        <div className="font-display-lg text-[24px] leading-tight text-on-surface font-bold">{currentStats.lateReturns}</div>
+                      </div>
+                      <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
+                        <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Due Books</div>
+                        <div className="font-display-lg text-[24px] leading-tight text-on-surface font-bold">{currentStats.dueBooks}</div>
+                      </div>
+                      <div className="bg-surface-container-low p-3 rounded-md border border-surface-variant">
+                        <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-1 font-bold">Total Amount Paid</div>
+                        <div className="font-display-lg text-[24px] leading-tight text-primary font-bold">₹{currentStats.totalPaidFines.toFixed(2)}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-2 text-left">
+                      <div className="text-on-surface-variant font-label-md text-[10px] uppercase mb-2 font-bold">Account Status</div>
+                      {totalOutstandingFine > 0 ? (
+                        <div className="flex items-center gap-2 bg-error-container/25 text-error p-3 rounded-md border border-error/30">
+                          <span className="material-symbols-outlined text-error text-[18px]">warning</span>
+                          <span className="font-body-sm text-[12px] font-semibold">Account Blocked - Fines Pending</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 bg-secondary-fixed-dim/20 text-on-surface p-3 rounded-md border border-secondary-fixed-dim/30">
+                          <span className="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+                          <span className="font-body-sm text-[12px] font-semibold">Active & In Good Standing</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Currently Borrowed Bento Card */}
+            <div className="lg:col-span-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="font-headline-sm text-[16px] text-primary flex items-center gap-1.5 m-0 font-semibold">
+                  <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>local_library</span> 
+                  Currently Borrowed 
+                  <span className="bg-primary-container text-on-primary-container rounded-full px-2 py-0.5 text-label-md text-[9px] ml-1 font-bold text-white">
+                    {borrowed.length}
+                  </span>
+                </h3>
+                {borrowed.length > 5 && (
+                  <button 
+                    onClick={() => setBorrowedPageSize(prev => prev === 5 ? 20 : 5)}
+                    className="text-primary font-label-md text-[11px] hover:underline flex items-center gap-1 border-none bg-transparent cursor-pointer font-bold"
+                  >
+                    {borrowedPageSize === 5 ? 'View All' : 'Collapse'} <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                  </button>
+                )}
+              </div>
+              
+              <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm overflow-hidden flex-1">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">
+                        <th className="py-2 px-3 font-bold">Title</th>
+                        <th className="py-2 px-3 font-bold">Transaction ID</th>
+                        <th className="py-2 px-3 font-bold">Due Date</th>
+                        <th className="py-2 px-3 text-right font-bold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-variant font-body-sm text-[12px] text-on-surface">
+                      {paginatedBorrowed.map((item, index) => (
+                        <tr key={index} className="hover:bg-surface-container-low transition-colors group">
+                          <td className="py-2 px-3">
+                            <div className="font-medium text-primary">{item.title}</div>
+                            <div className="text-on-surface-variant font-body-sm text-[10px]">{item.author}</div>
+                          </td>
+                          <td className="py-2 px-3 font-mono-sm text-[11px] text-primary">{item.id}</td>
+                          <td className="py-2 px-3">
+                            {item.isOverdue ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-error-container text-error font-label-md text-[9px] uppercase border border-error/20 font-bold">
+                                Overdue
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant font-label-md text-[9px] uppercase border border-outline-variant/30">
+                                {item.dueDate}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <button 
+                              onClick={() => handleRenewBook(item)}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-surface-container-low border border-outline-variant rounded hover:bg-surface-container hover:border-primary text-primary transition-all text-[11px] font-medium shadow-sm cursor-pointer"
+                              type="button"
+                            >
+                              Renew
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="px-4 py-2 border-t border-surface-variant flex items-center gap-2">
+                  <span className="font-label-md text-[12px] text-on-surface-variant font-bold">Books per page:</span>
+                  <select 
+                    value={borrowedPageSize}
+                    onChange={(e) => {
+                      setBorrowedPageSize(Number(e.target.value));
+                      setBorrowedPage(1);
+                    }}
+                    className="pagination-select bg-surface border border-outline-variant rounded py-1 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer text-[12px] h-8 font-medium"
+                  >
+                    <option className="text-on-surface bg-surface" value="5">5</option>
+                    <option className="text-on-surface bg-surface" value="10">10</option>
+                    <option className="text-on-surface bg-surface" value="20">20</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Historical Checkouts Bento Card */}
+            <div className="lg:col-span-3 mt-4">
+              <h3 className="font-headline-sm text-[16px] text-primary mb-2 flex items-center gap-1.5 m-0 font-semibold">
+                <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>history</span> 
+                Recent History
+              </h3>
+              
+              <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm p-4">
+                <div className="space-y-3">
+                  {paginatedHistory.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border border-surface-variant rounded-md bg-surface hover:bg-surface-container-low transition-colors group">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-surface-variant rounded flex items-center justify-center text-on-surface-variant group-hover:bg-primary-fixed group-hover:text-primary transition-colors">
+                          <span className="material-symbols-outlined text-[20px]">menu_book</span>
+                        </div>
+                        <div>
+                          <div className="font-body-sm text-[13px] font-semibold text-on-surface">
+                            {item.title} <span className="font-mono text-[11px] text-primary ml-1.5">{item.id}</span>
+                          </div>
+                          <div className="font-body-sm text-[11px] text-on-surface-variant">{item.date}</div>
+                        </div>
+                      </div>
+                      <span className="bg-surface-container-high text-on-surface font-label-md text-[9px] uppercase px-1.5 py-0.5 rounded font-bold">
+                        {item.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="px-4 py-2 border-t border-surface-variant flex items-center gap-2 mt-3 -mx-4 -mb-4">
+                  <span className="font-label-md text-[12px] text-on-surface-variant font-bold">Books per page:</span>
+                  <select 
+                    value={historyPageSize}
+                    onChange={(e) => {
+                      setHistoryPageSize(Number(e.target.value));
+                      setHistoryPage(1);
+                    }}
+                    className="pagination-select bg-surface border border-outline-variant rounded py-1 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer text-[12px] h-8 font-medium"
+                  >
+                    <option className="text-on-surface bg-surface" value="5">5</option>
+                    <option className="text-on-surface bg-surface" value="10">10</option>
+                    <option className="text-on-surface bg-surface" value="20">20</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Fees Collection History Bento Card */}
+            <div className="lg:col-span-3 mt-6">
+              <h3 className="font-headline-sm text-[16px] text-primary mb-2 flex items-center gap-1.5 m-0 font-semibold">
+                <span className="material-symbols-outlined text-secondary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span> 
+                Fees Collection History
+              </h3>
+              
+              <div className="bg-surface-container-lowest border border-surface-variant rounded-md shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-container-high border-b border-surface-variant font-label-md text-[10px] text-on-surface-variant uppercase tracking-wider">
+                        <th className="py-2 px-4 font-bold">Date</th>
+                        <th className="py-2 px-4 font-bold">Category</th>
+                        <th className="py-2 px-4 font-bold">Amount</th>
+                        <th className="py-2 px-4 text-right font-bold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-variant font-body-sm text-[12px] text-on-surface">
+                      {paginatedFees.length === 0 ? (
+                        <tr>
+                          <td colSpan="4" className="text-center py-6 text-on-surface-variant">No fee payment history found.</td>
+                        </tr>
+                      ) : (
+                        paginatedFees.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-surface-container-low transition-colors">
+                            <td className="py-3 px-4">{row.date}</td>
+                            <td className="py-3 px-4 font-medium">{row.category}</td>
+                            <td className="py-3 px-4">₹{row.amount.toFixed(2)}</td>
+                            <td className="py-3 px-4 text-right">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container font-label-md text-[9px] uppercase font-bold">
+                                <span className="material-symbols-outlined text-[12px]">check_circle</span> Paid
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="px-4 py-2 border-t border-surface-variant flex items-center gap-2">
+                  <span className="font-label-md text-[12px] text-on-surface-variant font-bold">Records per page:</span>
+                  <select 
+                    value={feesPageSize}
+                    onChange={(e) => {
+                      setFeesPageSize(Number(e.target.value));
+                      setFeesPage(1);
+                    }}
+                    className="pagination-select bg-surface border border-outline-variant rounded py-1 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer text-[12px] h-8 font-medium"
+                  >
+                    <option className="text-on-surface bg-surface" value="5">5</option>
+                    <option className="text-on-surface bg-surface" value="10">10</option>
+                    <option className="text-on-surface bg-surface" value="20">20</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Profile Modal */}
       <AnimatePresence>
         {showEditStudentModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -786,6 +1039,17 @@ function StudentManagement({
                 </div>
 
                 <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Registration Number</label>
+                  <input
+                    type="text"
+                    value={editStudentData.registration_number}
+                    onChange={(e) => setEditStudentData(prev => ({ ...prev, registration_number: e.target.value }))}
+                    className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    placeholder="Enter registration number"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Account Status</label>
                   <select
                     value={editStudentData.status}
@@ -818,7 +1082,171 @@ function StudentManagement({
           </div>
         )}
       </AnimatePresence>
-    </div>
+
+      <AnimatePresence>
+        {showAddStudentModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddStudentModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-lg p-6 relative z-10 border border-outline-variant shadow-xl text-left"
+            >
+                <div className="flex items-center justify-between mb-4 border-b border-surface-variant pb-2">
+                  <h3 className="text-base font-bold text-primary m-0">Add New Student</h3>
+                  <button onClick={() => setShowAddStudentModal(false)} className="text-on-surface-variant hover:text-primary cursor-pointer bg-transparent border-none flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddStudentSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Student ID</label>
+                    <input
+                      type="text"
+                      required
+                      value={addStudentData.student_id}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, student_id: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="e.g. 1234-22"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">First Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={addStudentData.first_name}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, first_name: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="Enter first name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Last Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={addStudentData.last_name}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, last_name: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="Enter last name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={addStudentData.email}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="Enter email address"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Contact Phone</label>
+                    <input
+                      type="text"
+                      value={addStudentData.phone}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Department</label>
+                    <input
+                      type="text"
+                      required
+                      value={addStudentData.department}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, department: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="e.g. Computer Science"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Class Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={addStudentData.class_name}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, class_name: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="e.g. Sophomore"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Age</label>
+                    <input
+                      type="number"
+                      required
+                      value={addStudentData.age}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, age: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="e.g. 20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Registration Number</label>
+                    <input
+                      type="text"
+                      value={addStudentData.registration_number}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, registration_number: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                      placeholder="Enter registration number"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">Account Status</label>
+                    <select
+                      value={addStudentData.status}
+                      onChange={(e) => setAddStudentData(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full bg-surface border border-surface-variant rounded-md px-3 py-2 font-body-sm text-[13px] text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Graduated">Graduated</option>
+                      <option value="Suspended">Suspended</option>
+                    </select>
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddStudentModal(false)}
+                      className="px-4 py-1.5 border border-outline-variant rounded-md font-label-md text-[11px] text-on-surface-variant hover:bg-surface-container-low transition-all border-none cursor-pointer bg-transparent"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-label-md text-[11px] hover:bg-primary/90 shadow-sm transition-all font-semibold border-none cursor-pointer"
+                    >
+                      Add Student
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
   );
 }
 
@@ -848,10 +1276,10 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
   if (txnLoading) {
     return (
       <div className="h-96 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
-          <p className="text-xs text-on-surface-variant font-medium">Loading History...</p>
-        </div>
+        <MorphingSquare
+          message="Loading History..."
+          className="bg-primary"
+        />
       </div>
     );
   }
@@ -860,6 +1288,7 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
   const historyRows = allTxns.map(tx => ({
     id:          String(tx.transaction_id).toUpperCase().startsWith('TRX-') ? tx.transaction_id : `TRX-${String(tx.transaction_id).padStart(4, '0')}`,
     studentName: tx.student_name,
+    registrationNumber: tx.registration_number,
     title:       tx.title || tx.book_title,
     type:        tx.status === 'Returned' ? 'Return' : 'Issue',
     issueDate:   tx.issue_date,
@@ -1156,6 +1585,12 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
                   <span className="text-on-surface-variant font-medium">Borrower</span>
                   <span className="col-span-2 font-semibold text-primary">{selectedTxDetails.studentName}</span>
                 </div>
+                {selectedTxDetails.registrationNumber && (
+                  <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
+                    <span className="text-on-surface-variant font-medium">Reg No</span>
+                    <span className="col-span-2 font-semibold text-primary">{selectedTxDetails.registrationNumber}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-surface-variant/30">
                   <span className="text-on-surface-variant font-medium">Book Title</span>
                   <span className="col-span-2">{selectedTxDetails.title}</span>
@@ -1213,11 +1648,15 @@ function TransactionHistory({ transactions, stats, loading, searchFilter }) {
 }
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('library_is_authenticated') === 'true';
+  });
   const [activeTab, setActiveTab] = useState('home');
   const [students, setStudents] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // State to trigger the "Add Book" modal inside BookCatalog
   const [addBookTrigger, setAddBookTrigger] = useState(0);
@@ -1395,105 +1834,51 @@ export default function App() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <Login 
+        onLogin={() => {
+          setIsAuthenticated(true);
+          localStorage.setItem('library_is_authenticated', 'true');
+        }} 
+      />
+    );
+  }
+
   return (
     <div className="bg-surface text-on-surface font-body-lg antialiased h-screen flex overflow-hidden">
-      {/* SideNavBar */}
-      <aside className="fixed left-0 top-0 h-full w-[240px] bg-primary dark:bg-primary shadow-md z-20 flex flex-col p-3">
-        {/* Brand Header */}
-        <div className="mb-6 flex items-center gap-2 px-2">
-          <img 
-            alt="Library System Logo" 
-            className="w-8 h-8 rounded-full object-cover border-2 border-surface-variant" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCixAdH9mYA1N5mXzA8Uk0p7Vtl-_68Mn3rL4mfzf-gEGDQNfImXVvW1pd5yhAaRtRJSH44WLzSPqDteLI7E605U4clnMLgoD-Vu36YFDmSyTTzse_9xSaqoc_7CXLYt-7IDEIk1mkfliogZ59bWNfrYZbi-7RV0bYWiwxXPDLuE2MmPULdJlIBowtVMnNBg1JzeEFJHjXaxv5t2VWlfhzEpbtChyiuGgaZLMN-uGXkJwqAn717y62fsILyjAhdcwcPN1p-OJMljc50"
-          />
-          <div className="text-left">
-            <h1 className="font-headline-sm text-[14px] leading-tight font-bold text-on-primary m-0">Sri Gowthami Educational Institutions</h1>
-            <p className="font-body-sm text-[11px] text-primary-fixed-dim m-0 mt-0.5">Admin Portal</p>
-          </div>
-        </div>
+      {/* Collapsible Sidebar */}
+      <AppSidebar
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          if (tab === 'students') {
+            setSelectedStudent(null);
+          }
+          setActiveTab(tab);
+          setMobileMenuOpen(false);
+        }}
+        onNewEntry={() => {
+          handleNewEntry();
+          setMobileMenuOpen(false);
+        }}
+        mobileOpen={mobileMenuOpen}
+        setMobileOpen={setMobileMenuOpen}
+        onLogout={() => {
+          setIsAuthenticated(false);
+          localStorage.removeItem('library_is_authenticated');
+        }}
+      />
 
-        {/* New Entry Button */}
-        <button 
-          onClick={handleNewEntry}
-          className="mb-4 w-full py-1.5 px-3 bg-on-primary text-primary rounded-md font-label-md text-[11px] hover:bg-surface-variant transition-colors cursor-pointer active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm border-none"
-        >
-          <span className="material-symbols-outlined text-[16px]">add</span>
-          New Entry
-        </button>
-
-        {/* Navigation Links */}
-        <nav className="flex-1 flex flex-col gap-1">
-          {/* Home Link */}
-          <button
-            onClick={() => setActiveTab('home')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md font-body-sm text-[13px] border-none text-left cursor-pointer active:scale-95 transition-transform ${
-              activeTab === 'home'
-                ? 'bg-primary-container text-on-primary-container'
-                : 'text-primary-fixed-dim hover:bg-on-primary-fixed-variant'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: `'FILL' ${activeTab === 'home' ? 1 : 0}` }}>home</span>
-            Home
-          </button>
-
-          {/* Books Catalog Link */}
-          <button
-            onClick={() => setActiveTab('books')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md font-body-sm text-[13px] border-none text-left cursor-pointer active:scale-95 transition-transform ${
-              activeTab === 'books'
-                ? 'bg-primary-container text-on-primary-container'
-                : 'text-primary-fixed-dim hover:bg-on-primary-fixed-variant'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: `'FILL' ${activeTab === 'books' ? 1 : 0}` }}>library_books</span>
-            Books Catalog
-          </button>
-
-          {/* Student Management Link */}
-          <button
-            onClick={() => setActiveTab('students')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md font-body-sm text-[13px] border-none text-left cursor-pointer active:scale-95 transition-transform ${
-              activeTab === 'students'
-                ? 'bg-primary-container text-on-primary-container'
-                : 'text-primary-fixed-dim hover:bg-on-primary-fixed-variant'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: `'FILL' ${activeTab === 'students' ? 1 : 0}` }}>group</span>
-            Student Management
-          </button>
-
-          {/* Transactions Link */}
-          <button
-            onClick={() => setActiveTab('transactions')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md font-body-sm text-[13px] border-none text-left cursor-pointer active:scale-95 transition-transform ${
-              activeTab === 'transactions'
-                ? 'bg-primary-container text-on-primary-container'
-                : 'text-primary-fixed-dim hover:bg-on-primary-fixed-variant'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: `'FILL' ${activeTab === 'transactions' ? 1 : 0}` }}>swap_horiz</span>
-            Transactions
-          </button>
-
-          {/* History Link */}
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md font-body-sm text-[13px] border-none text-left cursor-pointer active:scale-95 transition-transform ${
-              activeTab === 'history'
-                ? 'bg-primary-container text-on-primary-container'
-                : 'text-primary-fixed-dim hover:bg-on-primary-fixed-variant'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: `'FILL' ${activeTab === 'history' ? 1 : 0}` }}>history</span>
-            History
-          </button>
-        </nav>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col ml-[240px] h-full overflow-hidden">
+      {/* Main Content Area — flex-1 takes remaining space next to the sidebar spacer */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
         {/* TopNavBar */}
-        <header className="flex justify-between items-center h-12 px-4 bg-surface dark:bg-surface-dim text-primary dark:text-primary-fixed border-b border-outline-variant z-10 shrink-0">
+        <header className="flex justify-between items-center h-12 px-4 bg-surface dark:bg-surface-dim text-primary dark:text-primary-fixed border-b border-outline-variant z-10 shrink-0 gap-3">
+          <button 
+            className="md:hidden flex items-center justify-center p-1.5 -ml-2 rounded-md hover:bg-surface-container-low text-on-surface-variant cursor-pointer border-none bg-transparent"
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <span className="material-symbols-outlined text-[20px]">menu</span>
+          </button>
           <div className="flex-1 max-w-md relative search-box-container">
             <div className="relative flex items-center w-full h-8 rounded-md bg-surface-container-low border border-outline-variant focus-within:border-primary overflow-hidden transition-colors">
               <span className="material-symbols-outlined text-on-surface-variant ml-2 text-[18px]">search</span>

@@ -32,9 +32,11 @@ class Student(db.Model):
     phone:       str = db.Column(db.String(20))
     department:  str = db.Column(db.String(100))
     class_year:  str = db.Column(db.String(20))
+    age:         int = db.Column(db.Integer)
     status:      str = db.Column(
         db.String(20), nullable=False, default="Active"
     )  # 'Active' | 'Graduated' | 'Suspended'
+    registration_number: str = db.Column(db.String(50), nullable=True)
 
     # Relationship: a student can have many transactions
     transactions = db.relationship(
@@ -55,7 +57,9 @@ class Student(db.Model):
             "phone":       self.phone,
             "department":  self.department,
             "class_year":  self.class_year,
+            "age":         self.age,
             "status":      self.status,
+            "registration_number": self.registration_number,
         }
 
 

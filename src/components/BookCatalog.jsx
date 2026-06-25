@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { getBooks, addBook, updateBook, deleteBook } from '../lib/api';
+import { MorphingSquare } from './ui/morphing-square';
 
 export default function BookCatalog({ defaultCategory = '', addBookTrigger = 0, searchFilter = '' }) {
   const shouldReduceMotion = useReducedMotion();
@@ -456,10 +457,10 @@ export default function BookCatalog({ defaultCategory = '', addBookTrigger = 0, 
 
         {loading ? (
           <div className="h-64 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
-              <p className="text-xs text-on-surface-variant font-medium">Updating catalog assets...</p>
-            </div>
+            <MorphingSquare
+              message="Updating catalog assets..."
+              className="bg-primary"
+            />
           </div>
         ) : totalBooks === 0 ? (
           <div className="bg-surface-container-lowest border border-surface-variant rounded-md p-12 text-center text-on-surface-variant">

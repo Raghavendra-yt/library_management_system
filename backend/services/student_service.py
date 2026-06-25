@@ -32,6 +32,7 @@ def get_all_students(search: str = "") -> list[dict]:
                 Student.last_name.ilike(f"%{search}%"),
                 Student.student_id.ilike(f"%{search}%"),
                 Student.email.ilike(f"%{search}%"),
+                Student.registration_number.ilike(f"%{search}%"),
             )
         )
 
@@ -69,8 +70,10 @@ def create_student(payload: dict[str, Any]) -> tuple[Optional[dict], Optional[st
         email=payload["email"],
         phone=payload.get("phone", ""),
         department=payload.get("department", ""),
-        class_year=payload.get("class_year", ""),
+        class_year=payload.get("class_year", "") or payload.get("class_name", ""),
+        age=int(payload["age"]) if payload.get("age") is not None and str(payload["age"]).strip() != "" else None,
         status=payload.get("status", "Active"),
+        registration_number=payload.get("registration_number", ""),
     )
     db.session.add(student)
     db.session.commit()
@@ -113,8 +116,14 @@ def update_student(student_id: str, payload: dict[str, Any]) -> tuple[Optional[d
         student.department = payload["department"]
     if "class_year" in payload:
         student.class_year = payload["class_year"]
+    if "class_name" in payload:
+        student.class_year = payload["class_name"]
+    if "age" in payload:
+        student.age = int(payload["age"]) if payload["age"] is not None and str(payload["age"]).strip() != "" else None
     if "status" in payload:
         student.status = payload["status"]
+    if "registration_number" in payload:
+        student.registration_number = payload["registration_number"]
 
     db.session.commit()
     return student.to_dict(), None, 200
@@ -175,6 +184,7 @@ def get_student_transactions(student_id: str) -> tuple[Optional[list], Optional[
         item["book_title"] = txn.book.title
         item["book_author"] = txn.book.author
         item["student_name"] = f"{student.first_name} {student.last_name}"
+        item["registration_number"] = student.registration_number
         item["fine_amount"] = txn.fine.fine_amount if txn.fine else 0.0
         item["fine_id"] = txn.fine.fine_id if txn.fine else None
         item["fine_status"] = txn.fine.payment_status if txn.fine else None
