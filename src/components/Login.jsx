@@ -721,6 +721,54 @@ export default function Login({ onLogin }) {
             margin-bottom: 24px;
           }
         }
+        .login-page-container .demo-credentials {
+          margin-top: 16px;
+          padding: 12px 16px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          font-size: 13px;
+          color: #64748b;
+          text-align: left;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .login-page-container .demo-credentials strong {
+          color: #334155;
+          display: block;
+          margin-bottom: 6px;
+        }
+        .login-page-container .demo-credential-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 4px;
+        }
+        .login-page-container .demo-label {
+          font-weight: 500;
+        }
+        .login-page-container .demo-value {
+          font-family: monospace;
+          background: #f1f5f9;
+          color: #0f172a;
+          padding: 3px 8px;
+          border-radius: 6px;
+          font-size: 12px;
+          cursor: pointer;
+          border: 1px solid #e2e8f0;
+          transition: all 0.2s ease;
+        }
+        .login-page-container .demo-value:hover {
+          background: #e2e8f0;
+          color: #000;
+          transform: translateY(-1px);
+        }
+        .login-page-container .demo-hint {
+          display: block;
+          margin-top: 8px;
+          font-size: 11px;
+          color: #94a3b8;
+          text-align: center;
+        }
       `}</style>
 
       <div className="page">
@@ -771,6 +819,22 @@ export default function Login({ onLogin }) {
             <div className="header">
               <h1>Welcome Back!</h1>
               <p>Please enter your login information</p>
+              <div className="demo-credentials">
+                <strong>Demo Credentials:</strong>
+                <div className="demo-credential-item">
+                  <span className="demo-label">Email:</span>
+                  <span className="demo-value" title="Click to fill" onClick={() => setEmail('admin@library.com')}>
+                    admin@library.com
+                  </span>
+                </div>
+                <div className="demo-credential-item">
+                  <span className="demo-label">Password:</span>
+                  <span className="demo-value" title="Click to fill" onClick={() => setPassword('password123')}>
+                    password123
+                  </span>
+                </div>
+                <span className="demo-hint">(Click any credential to autofill)</span>
+              </div>
             </div>
             
             {error && (
