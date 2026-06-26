@@ -18,7 +18,8 @@ def register_routes(app: Flask) -> None:
     from .fines import fines_bp
     from .dashboard import dashboard_bp
     from .health import health_bp
+    from .auth import auth_bp
 
     for bp in [books_bp, students_bp, transactions_bp,
-               fines_bp, dashboard_bp, health_bp]:
+               fines_bp, dashboard_bp, health_bp, auth_bp]:
         app.register_blueprint(bp)

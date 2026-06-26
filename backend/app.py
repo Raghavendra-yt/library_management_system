@@ -20,7 +20,7 @@ Run:  python app.py
 import os
 
 # pyrefly: ignore [missing-import]
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 
 from config import Config, BASE_DIR
@@ -73,6 +73,48 @@ def create_app() -> Flask:
     # ── Extensions ────────────────────────────────────────────────────────
     db.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+    # ── Global API Authentication Check ────────────────────────────────────
+    @app.before_request
+    def check_api_authentication():
+        # Exempt health check and authentication endpoints
+        path = request.path
+        if not path.startswith("/api/"):
+            return None  # Serves static files / frontend app
+        
+        if path == "/api/v1/health" or path.startswith("/api/v1/auth/"):
+            return None
+            
+        # OPTIONS request is sent by browsers for CORS pre-flight, allow it
+        if request.method == "OPTIONS":
+            return None
+
+        # Check Authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            from utils import error_response
+            response, status = error_response("Authentication token is missing or invalid.", 401)
+            return response, status
+        
+        token = auth_header.split(" ")[1]
+        from routes.auth import verify_auth_token
+        user_id = verify_auth_token(token)
+        if not user_id:
+            from utils import error_response
+            response, status = error_response("Authentication token is expired or invalid.", 401)
+            return response, status
+            
+        # Attach user to request context (flask.g) for easy access
+        from flask import g
+        from models import User
+        user = User.query.get(user_id)
+        if not user:
+            from utils import error_response
+            response, status = error_response("User not found.", 401)
+            return response, status
+            
+        g.current_user = user
+        return None
 
     # ── Route Blueprints ──────────────────────────────────────────────────
     register_routes(app)

@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { login, register } from '../lib/api';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [name, setName] = useState('');
 
   // Refs for tracking animation state variables (avoids React re-renders for mouse movements)
   const mouseX = useRef(0);
@@ -56,21 +59,31 @@ export default function Login({ onLogin }) {
     }, 800);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password) {
       setError('Please fill in both fields.');
       return;
     }
 
-    // Mock verification
-    if (email.includes('@') && password.length >= 6) {
+    try {
+      if (isSignUp) {
+        if (!name.trim()) {
+          setError('Please fill in your name.');
+          return;
+        }
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters.');
+          return;
+        }
+        await register(name, email, password);
+      } else {
+        await login(email, password);
+      }
       setError('');
       onLogin();
-    } else if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-    } else {
-      setError('Please enter a valid email address.');
+    } catch (err) {
+      setError(err.message || 'An error occurred during authentication.');
     }
   };
 
@@ -817,24 +830,26 @@ export default function Login({ onLogin }) {
         <div className="right">
           <div className="form-box">
             <div className="header">
-              <h1>Welcome Back!</h1>
-              <p>Please enter your login information</p>
-              <div className="demo-credentials">
-                <strong>Demo Credentials:</strong>
-                <div className="demo-credential-item">
-                  <span className="demo-label">Email:</span>
-                  <span className="demo-value" title="Click to fill" onClick={() => setEmail('admin@library.com')}>
-                    admin@library.com
-                  </span>
+              <h1>{isSignUp ? 'Create an Account' : 'Welcome Back!'}</h1>
+              <p>{isSignUp ? 'Join Sri Gowthami Educational Admin Portal' : 'Please enter your login information'}</p>
+              {!isSignUp && (
+                <div className="demo-credentials">
+                  <strong>Demo Credentials:</strong>
+                  <div className="demo-credential-item">
+                    <span className="demo-label">Email:</span>
+                    <span className="demo-value" title="Click to fill" onClick={() => setEmail('admin@library.com')}>
+                      admin@library.com
+                    </span>
+                  </div>
+                  <div className="demo-credential-item">
+                    <span className="demo-label">Password:</span>
+                    <span className="demo-value" title="Click to fill" onClick={() => setPassword('password123')}>
+                      password123
+                    </span>
+                  </div>
+                  <span className="demo-hint">(Click any credential to autofill)</span>
                 </div>
-                <div className="demo-credential-item">
-                  <span className="demo-label">Password:</span>
-                  <span className="demo-value" title="Click to fill" onClick={() => setPassword('password123')}>
-                    password123
-                  </span>
-                </div>
-                <span className="demo-hint">(Click any credential to autofill)</span>
-              </div>
+              )}
             </div>
             
             {error && (
@@ -844,6 +859,21 @@ export default function Login({ onLogin }) {
             )}
 
             <form id="loginForm" onSubmit={handleSubmit}>
+              {isSignUp && (
+                <div className="field">
+                  <label htmlFor="name">Full Name</label>
+                  <input
+                    id="name"
+                    type="text"
+                    placeholder="John Doe"
+                    autoComplete="off"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                  />
+                </div>
+              )}
               <div className="field">
                 <label htmlFor="email">Email</label>
                 <input
@@ -889,7 +919,7 @@ export default function Login({ onLogin }) {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"
-                        />
+                         />
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -915,16 +945,18 @@ export default function Login({ onLogin }) {
                   </button>
                 </div>
               </div>
-              <div className="row">
-                <label className="remember">
-                  <input type="checkbox" />Remember me for 30 days
-                </label>
-                <a href="#" onClick={(e) => e.preventDefault()}>Forgot password?</a>
-              </div>
+              {!isSignUp && (
+                <div className="row">
+                  <label className="remember">
+                    <input type="checkbox" />Remember me for 30 days
+                  </label>
+                  <a href="#" onClick={(e) => e.preventDefault()}>Forgot password?</a>
+                </div>
+              )}
               <button type="submit" className="hover-btn">
-                <span className="label">Sign In</span>
+                <span className="label">{isSignUp ? 'Sign Up' : 'Sign In'}</span>
                 <div className="overlay">
-                  <span>Sign In</span>
+                  <span>{isSignUp ? 'Sign Up' : 'Sign In'}</span>
                   <svg
                     className="arrow-icon"
                     xmlns="http://www.w3.org/2000/svg"
@@ -943,7 +975,21 @@ export default function Login({ onLogin }) {
               </button>
             </form>
             <div className="divider">
-              Don't have an account? <a href="#" onClick={(e) => e.preventDefault()}>Sign up now</a>
+              {isSignUp ? (
+                <>
+                  Already have an account?{' '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); setIsSignUp(false); setError(''); }}>
+                    Log in now
+                  </a>
+                </>
+              ) : (
+                <>
+                  Don't have an account?{' '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); setIsSignUp(true); setError(''); }}>
+                    Sign up now
+                  </a>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -30,6 +30,7 @@ class Config:
         "mysql+pymysql://root:@localhost:3306/library_db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
+    SECRET_KEY: str = os.environ.get("SECRET_KEY", "secure-library-secret-key-998877")
 
     # Static files (built React frontend)
     STATIC_FOLDER: str = DIST_DIR

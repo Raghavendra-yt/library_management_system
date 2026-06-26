@@ -5,16 +5,32 @@
  * Requests to /api/* are automatically forwarded to http://localhost:5000.
  * The Flask server must be running: py backend/app.py
  */
-const BASE_URL = '/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api/v1` 
+  : '/api/v1';
 // ---------------------------------------------------------------------------
 // Internal helper — makes an HTTP request and unwraps the standard envelope
 // { status: "success", data: ... } | { status: "error", message: ... }
 // ---------------------------------------------------------------------------
 async function request(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  const token = localStorage.getItem('library_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
     ...options,
   });
+
+  if (response.status === 401) {
+    localStorage.removeItem('library_token');
+    localStorage.removeItem('library_is_authenticated');
+    window.location.reload();
+    throw new Error('Session expired. Please log in again.');
+  }
+
   const json = await response.json();
   if (!response.ok || json.status === 'error') {
     throw new Error(json.message || `Request failed: ${response.status}`);
@@ -327,6 +343,38 @@ export async function createFine(fineData) {
       transaction_id: fineData.transaction_id || undefined,
     }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+export async function login(email, password) {
+  const data = await request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+  if (data.token) {
+    localStorage.setItem('library_token', data.token);
+    localStorage.setItem('library_is_authenticated', 'true');
+  }
+  return data;
+}
+
+export async function register(name, email, password) {
+  const data = await request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password }),
+  });
+  if (data.token) {
+    localStorage.setItem('library_token', data.token);
+    localStorage.setItem('library_is_authenticated', 'true');
+  }
+  return data;
+}
+
+export async function getProfile() {
+  return request('/auth/me');
 }
 
 // ---------------------------------------------------------------------------

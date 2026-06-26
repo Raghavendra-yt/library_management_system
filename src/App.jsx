@@ -1668,12 +1668,13 @@ export default function App() {
 
   // Sync books list
   useEffect(() => {
+    if (!isAuthenticated) return;
     const fetchAllBooks = async () => {
       const booksData = await getBooks();
       setAllBooks(booksData);
     };
     fetchAllBooks();
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
 
   // Click outside to close global search dropdown
   useEffect(() => {
@@ -1764,9 +1765,11 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchStatsAndStudents();
+    if (isAuthenticated) {
+      fetchStatsAndStudents();
+    }
     window.document.documentElement.classList.remove('dark');
-  }, []);
+  }, [isAuthenticated]);
 
   const handleGlobalAddBook = () => {
     setActiveTab('books');
@@ -1866,6 +1869,7 @@ export default function App() {
         onLogout={() => {
           setIsAuthenticated(false);
           localStorage.removeItem('library_is_authenticated');
+          localStorage.removeItem('library_token');
         }}
       />
 

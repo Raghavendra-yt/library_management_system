@@ -181,3 +181,28 @@ class Fine(db.Model):
             "payment_status": self.payment_status,
             "paid_date":      str(self.paid_date) if self.paid_date else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# User
+# ---------------------------------------------------------------------------
+
+class User(db.Model):
+    """
+    Represents a system user (admin/librarian).
+    """
+    __tablename__ = "users"
+
+    id: int = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name: str = db.Column(db.String(100), nullable=False)
+    email: str = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash: str = db.Column(db.String(255), nullable=False)
+
+    def to_dict(self) -> dict:
+        """Serialize user to a JSON-safe dictionary."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+        }
+

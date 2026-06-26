@@ -9,7 +9,7 @@ import os
 from datetime import date, timedelta
 from sqlalchemy import inspect, text
 
-from models import db, Student, Book, Transaction, Fine
+from models import db, Student, Book, Transaction, Fine, User
 from utils import calculate_fine
 
 
@@ -80,6 +80,18 @@ def seed_database() -> None:
     Inserts 7 students, 10 books, 7 transactions, and fines for the
     first 5 overdue transactions. Skipped entirely if data already exists.
     """
+    # Seed default user if none exists
+    from werkzeug.security import generate_password_hash
+    if not User.query.first():
+        print("  -> Seeding default admin user...")
+        admin = User(
+            name="Library Admin",
+            email="admin@library.com",
+            password_hash=generate_password_hash("password123")
+        )
+        db.session.add(admin)
+        db.session.commit()
+
     if Student.query.first():
         return  # Already seeded
 

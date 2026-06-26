@@ -42,3 +42,5 @@ backend/library.db
 .env.local
 .env.production
 
+.vercel
+.env*
